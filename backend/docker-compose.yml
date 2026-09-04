@@ -12,15 +12,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-  ollama:
-    image: ollama/ollama:latest
-    ports: ["11434:11434"]
-    volumes: ["ollama_data:/root/.ollama"]
+
   api:
     build: .
     env_file: ./.env
     environment:
       PYTHONPATH: /app
+      DATABASE_URL: postgresql+psycopg://vaultis:vaultis@postgres:5432/vaultis
+      ENABLE_TAMPER_DEMO_ENDPOINT: "true"
     ports: ["8000:8000"]
     depends_on:
       postgres:
@@ -32,6 +31,6 @@ services:
       - documents_data:/data/documents
 volumes:
   postgres_data:
-  ollama_data:
+
   chroma_data:
   documents_data:
