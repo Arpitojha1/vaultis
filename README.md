@@ -25,7 +25,7 @@ By utilizing **Local Ollama with DeepSeek-R1 via Docker**:
 
 ---
 
-## 🎯 Alignment with SIH26190 Deliverables
+## Alignment with SIH26190 Deliverables
 
 Our solution directly addresses all core challenges outlined by the Ministry of Home Affairs (MHA):
 
@@ -48,7 +48,7 @@ Powered by **ChromaDB** and our local **DeepSeek-R1** model, documents are chunk
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS (with fully integrated Dark Mode)
 - **Backend:** FastAPI (Python), SQLAlchemy
@@ -58,7 +58,7 @@ Powered by **ChromaDB** and our local **DeepSeek-R1** model, documents are chunk
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -93,7 +93,7 @@ The database automatically seeds with the following demo accounts so you can tes
 
 ---
 
-## 🎨 UI/UX Features
+##  UI/UX Features
 - **Dark Mode Native:** Designed specifically for investigators and lawyers looking at screens for extended hours. The UI features a sleek, low-strain dark mode built natively into Tailwind.
 - **Instant AI Chat:** "Thinking..." animations and ultra-fast local inference.
 - **Inline Document Viewer:** Securely stream and view decrypted PDFs directly in the browser without downloading them to local, potentially unsecure devices.
