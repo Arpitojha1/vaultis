@@ -8,7 +8,7 @@ This repository was built specifically to address the **Smart India Hackathon (S
 
 ---
 
-## 🔒 Branch: `devansh-backend` (Local Air-Gapped AI Implementation)
+## Branch: `devansh-backend` (Local Air-Gapped AI Implementation)
 
 This branch represents the **highest security tier** implementation of Vaultis. 
 
