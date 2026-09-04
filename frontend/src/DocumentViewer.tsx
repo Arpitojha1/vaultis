@@ -16,7 +16,8 @@ export function DocumentViewer({ documentId, onClose }: { documentId: string; on
       .then(async (response) => {
         if (!mounted) return;
         if (response.ok) {
-          const blob = await response.blob();
+          const rawBlob = await response.blob();
+          const blob = new Blob([rawBlob], { type: 'application/pdf' });
           url = URL.createObjectURL(blob);
           if (mounted) {
             setBlobUrl(url);
