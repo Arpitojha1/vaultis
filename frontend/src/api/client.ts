@@ -45,10 +45,12 @@ export const api = {
     if (sensitivityLevel) form.append('sensitivity_level', sensitivityLevel);
     return request(`/cases/${caseId}/documents`, { method: 'POST', body: form });
   },
+  // TODO(verify): confirm document_id is honored by BE1:B9 once merged
   answerQuery: (caseId: number, question: string, documentId?: string) => request('/answer_query', { method: 'POST', body: JSON.stringify({ case_id: caseId, question, ...(documentId ? { document_id: documentId } : {}) }) }),
   getAuditEvents: () => request('/audit-events'),
   verifyChain: () => request('/verify-chain', { method: 'POST' }),
   tamperEvent: (recordId: number) => request(`/audit-events/${recordId}/tamper`, { method: 'POST' }),
   getEncryptionStatus: (documentId: number) => request(`/documents/${documentId}/encryption-status`),
   getDocumentView: (documentId: string) => requestRaw(`/documents/${documentId}/view`),
+  deleteCase: (caseId: number) => request(`/cases/${caseId}`, { method: 'DELETE' }),
 };

@@ -9,6 +9,7 @@ import { AuditLogScreen } from './components/AuditLogScreen';
 import { PrepareWorkspace } from './components/PrepareWorkspace';
 import { DocumentList } from './components/DocumentList';
 import { DocumentViewer } from './DocumentViewer';
+import { LandingPage } from './components/LandingPage';
 
 type Screen = 'dashboard' | 'chat' | 'audit' | 'prepare' | 'documents' | 'doc-chat';
 
@@ -21,95 +22,79 @@ export default function App() {
   const [error, setError] = useState('');
   const [docId, setDocId] = useState<string | null>(null);
   const [docFilename, setDocFilename] = useState<string | null>(null);
-  
-  const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem('theme') === 'dark' ||
-      (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const [showLogin, setShowLogin] = useState(false);
+
+  // ── Dark mode: stored in localStorage, default = LIGHT ──────────────────
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('vaultis-theme');
+      return stored === 'dark';
+    } catch {
+      return false;
+    }
   });
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDark]);
+  const toggleDark = () =>
+    setIsDarkMode(prev => {
+      const next = !prev;
+      try { localStorage.setItem('vaultis-theme', next ? 'dark' : 'light'); } catch { /* noop */ }
+      return next;
+    });
+  // ────────────────────────────────────────────────────────────────────────
 
-  const toggleDark = () => setIsDark(prev => !prev);
-
-  const logout = () => { 
-    setAuthToken(null); 
-    setUser(null); 
-    setCases([]); 
-    setCaseItem(null); 
-    setScreen('dashboard'); 
-    setDocId(null);
-    setDocFilename(null);
+  const logout = () => {
+    setAuthToken(null); setUser(null); setCases([]); setCaseItem(null);
+    setScreen('dashboard'); setDocId(null); setDocFilename(null); setShowLogin(false);
   };
-  
+
   useEffect(() => { setUnauthorizedHandler(logout); return () => setUnauthorizedHandler(null); }, []);
-  
-  const refreshCases = async () => { 
-    setLoading(true); setError(''); 
-    try { 
-      const result = await api.getCases(); 
-      setCases(result); 
-      return result as ApiCase[]; 
-    } catch (e) { 
-      setError(e instanceof Error ? e.message : 'Unable to load cases'); 
-      return []; 
-    } finally { 
-      setLoading(false); 
-    } 
+
+  const refreshCases = async () => {
+    setLoading(true); setError('');
+    try { const result = await api.getCases(); setCases(result); return result as ApiCase[]; }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load cases'); return []; }
+    finally { setLoading(false); }
   };
-  
-  const login = async (username: string, password: string) => { 
-    setError(''); 
+
+  const login = async (username: string, password: string) => {
+    setError('');
     try {
-      const result = await api.login(username, password); 
-      setAuthToken(result.token); 
-      setUser(result.user); 
-      const loaded = await refreshCases(); 
-      setScreen(loaded.length ? 'dashboard' : 'prepare'); 
+      const result = await api.login(username, password);
+      setAuthToken(result.token);
+      setUser(result.user);
+      const loaded = await refreshCases();
+      setScreen(loaded.length ? 'dashboard' : 'prepare');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
     }
   };
-  
-  if (!user) return <LandingAuth onLogin={login} error={error} isDark={isDark} toggleDark={toggleDark} />;
-  
+
+  // ── The 'dark' class lives on this wrapper div — no DOM hacks needed ────
+  // Tailwind's @custom-variant dark (&:is(.dark *)) targets descendants of .dark
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
-      <Navbar 
-        user={user} 
-        screen={screen} 
-        currentCase={caseItem} 
-        onNavigate={setScreen} 
-        onLogout={logout}
-        isDark={isDark}
-        toggleDark={toggleDark}
-      />
-      {loading && <p className="text-center p-3 text-sm text-slate-500 dark:text-slate-400">Loading vault data…</p>}
-      {error && <p className="mx-auto mt-4 max-w-6xl rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400">{error}</p>}
-      <main>
-        {screen === 'prepare' && <PrepareWorkspace onReady={async item => { const loaded = await refreshCases(); setCases(loaded); setCaseItem(item); setScreen('dashboard'); }}/>} 
-        {screen === 'dashboard' && <CaseDashboard cases={cases} user={user} onSelect={item => { setCaseItem(item); setScreen('documents'); }} onAudit={() => setScreen('audit')} />}
-        {screen === 'chat' && caseItem && <ChatScreen caseItem={caseItem} user={user} />}
-        {screen === 'audit' && <AuditLogScreen />}
-        {screen === 'documents' && caseItem && (
-          <>
-            <DocumentList 
-              caseId={caseItem.case_id} 
-              onViewDoc={(id) => setDocId(id)} 
-              onOpenDocChat={(id, name) => { setDocId(id); setDocFilename(name); setScreen('doc-chat'); }} 
-            />
-            {docId && <DocumentViewer documentId={docId} onClose={() => setDocId(null)} />}
-          </>
-        )}
-        {screen === 'doc-chat' && caseItem && <ChatScreen caseItem={caseItem} user={user} documentId={docId || undefined} documentFilename={docFilename || undefined} />}
-      </main>
+    <div className={isDarkMode ? 'dark' : ''}>
+      {!user && !showLogin && (
+        <LandingPage onLoginClick={() => setShowLogin(true)} isDarkMode={isDarkMode} onToggleDark={toggleDark} />
+      )}
+      {!user && showLogin && (
+        <LandingAuth onLogin={login} error={error} onBack={() => setShowLogin(false)} isDarkMode={isDarkMode} onToggleDark={toggleDark} />
+      )}
+      {user && (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+          <Navbar user={user} screen={screen} currentCase={caseItem} onNavigate={setScreen} onLogout={logout} isDarkMode={isDarkMode} onToggleDark={toggleDark} />
+          {loading && <p className="text-center p-3 text-sm text-slate-500 dark:text-slate-400">Loading vault data…</p>}
+          {error && <p className="mx-auto mt-4 max-w-6xl rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-400">{error}</p>}
+          <main>
+            {screen === 'prepare' && <PrepareWorkspace onReady={async item => { const loaded = await refreshCases(); setCases(loaded); setCaseItem(item); setScreen('dashboard'); }} />}
+            {screen === 'dashboard' && <CaseDashboard cases={cases} user={user} onSelect={item => { setCaseItem(item); setScreen('documents'); }} onAudit={() => setScreen('audit')} onCaseDeleted={(id) => setCases(prev => prev.filter(c => c.case_id !== id))} />}
+            {screen === 'chat' && caseItem && <ChatScreen caseItem={caseItem} user={user} />}
+            {screen === 'audit' && <AuditLogScreen />}
+            {screen === 'documents' && caseItem && <DocumentList caseId={caseItem.case_id} onViewDoc={(id) => setDocId(id)} onOpenDocChat={(id, name) => { setDocId(id); setDocFilename(name); setScreen('doc-chat'); }} />}
+            {screen === 'doc-chat' && caseItem && <ChatScreen caseItem={caseItem} user={user} documentId={docId || undefined} documentFilename={docFilename || undefined} />}
+          </main>
+          {docId && screen === 'documents' && <DocumentViewer documentId={docId} onClose={() => setDocId(null)} />}
+        </div>
+      )}
     </div>
   );
 }

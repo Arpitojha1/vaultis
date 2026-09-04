@@ -3,7 +3,7 @@ from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import io
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from .audit import append_record, verify_chain
 from .auth import create_token, current_user, password_hash
@@ -87,6 +87,31 @@ def create_case(request: CreateCaseRequest, user: User = Depends(current_user), 
     db.commit()
     return {"case_id": case.case_id, "case_number": case.case_number, "title": case.title, "status": case.status}
 
+
+@app.delete("/cases/{case_id}")
+def delete_case(case_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    permitted = db.scalar(select(CaseAccess).where(CaseAccess.case_id == case_id, CaseAccess.user_id == user.user_id))
+    if not permitted:
+        raise HTTPException(status_code=403, detail="No access to this case")
+    case = db.scalar(select(Case).where(Case.case_id == case_id))
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    # Delete related records in order: access, chunks, documents, then case
+    db.execute(
+    delete(ChunkPermission).where(
+        ChunkPermission.document_id.in_(
+            select(Document.document_id).where(
+                Document.case_id == case_id
+            )
+        )
+    )
+)
+    db.execute(delete(Document).where(Document.case_id == case_id))
+    db.execute(delete(CaseAccess).where(CaseAccess.case_id == case_id))
+    append_record(db, "case_deleted", user.user_id, {"case_id": case_id, "case_number": case.case_number})
+    db.delete(case)
+    db.commit()
+    return {"deleted": True, "case_id": case_id}
 
 @app.get("/cases/{case_id}/documents")
 def list_documents(case_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[dict]:

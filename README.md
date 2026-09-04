@@ -23,6 +23,9 @@ By utilizing **Local Ollama with DeepSeek-R1 via Docker**:
 3. **Optimized Inference:** We implemented a zero-wait preloading mechanism in the FastAPI backend that continuously keeps the 4.7GB DeepSeek model active in GPU VRAM, ensuring instant AI chat responses without the cold-start delays normally associated with local LLMs.
 4. **Absolute Legal Compliance:** Guaranteed adherence to the Indian Evidence Act regarding digital privacy, as no third-party APIs process the unencrypted data.
 
+### 🔄 Latest Integration (Main Branch Sync)
+The UI in this branch has been fully synchronized with the newest **MVP Redesign** from the `main` branch. It features the beautiful new Timeline Audit Log, minimal slate-palette aesthetic, and React-Markdown chat integration, all while maintaining the air-gapped security model and newly implemented Dark Mode styling.
+
 ---
 
 ## Alignment with SIH26190 Deliverables
