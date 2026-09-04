@@ -1,0 +1,7 @@
+{
+  "name": "Vaultis",
+  "description": "Secure case-document vault and permission-checked AI investigation platform for legal teams.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
