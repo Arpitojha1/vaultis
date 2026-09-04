@@ -33,7 +33,7 @@ export function DocumentList({ caseId, onOpenDocChat, onViewDoc }: { caseId: num
 
   return (
     <div className="mx-auto max-w-5xl p-6">
-      <h2 className="text-2xl font-bold mb-6">Case Documents</h2>
+      <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">Case Documents</h2>
       {loading && <p className="text-slate-500">Loading documents...</p>}
       {error && <p className="text-red-600">{error}</p>}
       {!loading && !error && documents.length === 0 && (
@@ -44,21 +44,21 @@ export function DocumentList({ caseId, onOpenDocChat, onViewDoc }: { caseId: num
           {documents.map(doc => (
             <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200">
               <div className="flex items-center gap-3">
-                <FileText className="text-blue-600" />
-                <span className="font-medium text-slate-800">{doc.filename}</span>
+                <FileText className="text-slate-700" strokeWidth={1.5} />
+                <span className="font-medium text-slate-900">{doc.filename}</span>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => onViewDoc(doc.id)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
                 >
-                  <Eye className="w-4 h-4" /> View
+                  <Eye className="w-4 h-4" strokeWidth={1.5} /> View
                 </button>
                 <button
                   onClick={() => onOpenDocChat(doc.id, doc.filename)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors"
                 >
-                  <MessageSquare className="w-4 h-4" /> Chat about this
+                  <MessageSquare className="w-4 h-4" strokeWidth={1.5} /> Chat about this
                 </button>
               </div>
             </div>
