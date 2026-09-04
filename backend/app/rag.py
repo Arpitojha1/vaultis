@@ -116,18 +116,23 @@ async def ingest_document(db: Session, case_id: int, file: UploadFile, sensitivi
     return document, len(ids)
 
 
-async def answer_with_ollama(question: str, authorized_text: list[str]) -> str:
+async def answer_with_groq(question: str, authorized_text: list[str]) -> str:
     """The prompt contains only already-authorized retrieval results; no secrecy instruction is used."""
     context = "\n\n".join(f"[{i + 1}] {text}" for i, text in enumerate(authorized_text))
     prompt = f"Answer the legal case question using only this evidence context. If insufficient, say so.\n\nEvidence context:\n{context}\n\nQuestion: {question}"
     settings = get_settings()
+    import groq
+    from groq import AsyncGroq
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(f"{settings.ollama_base_url.rstrip('/')}/api/generate", json={"model": settings.ollama_model, "prompt": prompt, "stream": False})
-            response.raise_for_status()
-            return response.json()["response"].strip()
-    except (httpx.HTTPError, KeyError) as exc:
-        raise HTTPException(status_code=503, detail="Local LLM is unavailable") from exc
+        client = AsyncGroq(api_key=settings.groq_api_key, timeout=60.0)
+        response = await client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[{"role": "user", "content": prompt}],
+            stream=False
+        )
+        return response.choices[0].message.content.strip()
+    except groq.GroqError as exc:
+        raise HTTPException(status_code=503, detail="Groq API is unavailable or rate limited") from exc
 
 
 async def retrieve_answer(db: Session, case_id: int, user_role: str, question: str, document_id: int | None = None) -> tuple[str, list[dict], list[dict], list[str]]:
@@ -160,5 +165,5 @@ async def retrieve_answer(db: Session, case_id: int, user_role: str, question: s
     texts = result.get("documents", [[]])[0]
     metadata = result.get("metadatas", [[]])[0]
     authorized = [{"chunk_id": chunk_id, "text": text, "document_id": item["document_id"], "sensitivity_level": db.get(ChunkPermission, chunk_id).sensitivity_level} for chunk_id, text, item in zip(ids, texts, metadata)]
-    answer = await answer_with_ollama(question, [chunk["text"] for chunk in authorized])
+    answer = await answer_with_groq(question, [chunk["text"] for chunk in authorized])
     return answer, authorized, filtered, allowed_ids
