@@ -5,6 +5,7 @@ Set DEMO_ACCOUNTS_ENABLED=false to skip demo user creation entirely.
 """
 import logging
 import os
+from uuid import uuid4
 from sqlalchemy import select
 from app.audit import append_record
 from app.auth import password_hash
@@ -90,7 +91,22 @@ def main() -> None:
                 if not db.scalar(select(CaseAccess).where(CaseAccess.case_id == case.case_id, CaseAccess.user_id == user.user_id)):
                     db.add(CaseAccess(case_id=case.case_id, user_id=user.user_id))
             if not db.scalar(select(Document).where(Document.case_id == case.case_id)):
-                document = Document(case_id=case.case_id, filename="demo_evidence.txt", encrypted_path="seed-data/no-original-file")
+                # Generate a real encrypted PDF evidence file on disk for each case
+                pdf_content = (
+                    f"%PDF-1.4\n1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n"
+                    f"2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n"
+                    f"3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>> >> endobj\n"
+                    f"4 0 obj <</Length 200>>\nstream\nBT\n/F1 14 Tf\n50 750 Td\n(VAULTIS EVIDENTIARY EXHIBIT - {number}) Tj\n/F1 10 Tf\n50 710 Td\n(Title: {title}) Tj\nET\nendstream\nendobj\n"
+                    f"5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj\n"
+                    f"xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000062 00000 n \n0000000117 00000 n \n0000000236 00000 n \n0000000300 00000 n \ntrailer <</Size 6 /Root 1 0 R>>\nstartxref\n383\n%%EOF"
+                ).encode("latin1")
+                
+                doc_filename = f"evidence_{number.lower().replace('-', '_')}.pdf"
+                encrypted_path = get_settings().document_storage_path / str(case.case_id) / f"{uuid4()}.aes"
+                from app.rag import encrypt_to_disk
+                encrypt_to_disk(pdf_content, encrypted_path)
+
+                document = Document(case_id=case.case_id, filename=doc_filename, encrypted_path=str(encrypted_path))
                 db.add(document)
                 db.flush()
                 ids = [f"doc{document.document_id}_chunk{index}" for index in range(len(CHUNKS))]
