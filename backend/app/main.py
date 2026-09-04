@@ -73,6 +73,15 @@ def create_case(request: CreateCaseRequest, user: User = Depends(current_user), 
     return {"case_id": case.case_id, "case_number": case.case_number, "title": case.title, "status": case.status}
 
 
+@app.get("/cases/{case_id}/documents")
+def list_documents(case_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[dict]:
+    permitted = db.scalar(select(CaseAccess).where(CaseAccess.case_id == case_id, CaseAccess.user_id == user.user_id))
+    if not permitted:
+        raise HTTPException(status_code=403, detail="No access to this case")
+    docs = db.scalars(select(Document).where(Document.case_id == case_id).order_by(Document.document_id)).all()
+    return [{"id": str(doc.document_id), "document_id": doc.document_id, "filename": doc.filename} for doc in docs]
+
+
 @app.post("/cases/{case_id}/documents")
 async def upload_document(case_id: int, file: UploadFile = File(...), sensitivity_level: str = Form("case_team"), disclosed_to_defense: bool = Form(False), user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     permitted = db.scalar(select(CaseAccess).where(CaseAccess.case_id == case_id, CaseAccess.user_id == user.user_id))
