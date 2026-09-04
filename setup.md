@@ -26,14 +26,13 @@ VITE_ENABLE_TAMPER_DEMO=true
 
 ---
 
-### Step 2: Start the Backend (Postgres + API + Ollama)
+### Step 2: Start the Backend (Postgres + API)
 
 The backend directory contains a `docker-compose.yml` that automatically:
 1. Starts PostgreSQL 16 on port `5432`.
 2. Runs Alembic database migrations (`alembic upgrade head`).
 3. Seeds the demo cases, users, documents, and chunk permissions (`python seed.py`).
-4. Starts Ollama on port `11434`.
-5. Starts the FastAPI server on port `8000`.
+4. Starts the FastAPI server on port `8000`.
 
 In PowerShell:
 ```powershell
@@ -49,14 +48,16 @@ docker compose logs -f api
 
 ---
 
-### Step 3: Pull the Local LLM Model in Ollama
+### Step 3: Configure Groq API Key
 
-The backend connects to Ollama for evidence synthesis. Pull the configured model into the running container:
+The backend connects to Groq for evidence synthesis. Ensure you have copied `.env.example` to `.env` and populated the `GROQ_API_KEY` variable:
 
 ```powershell
-docker compose exec ollama ollama pull mistral:7b-instruct-q4_K_M
+# Open backend/.env and set:
+GROQ_API_KEY=your_actual_key_here
 ```
-> **Note**: If download speed or memory is constrained, you can also use a smaller model like `mistral:7b` or `llama3.2:3b`. Update `OLLAMA_MODEL` in `backend/.env` if you change it.
+> **Note**: The default model is `llama-3.3-70b-versatile`. Update `GROQ_MODEL` in `backend/.env` if you prefer a different supported model.
+
 
 Verify the backend is live:
 - Visit **[http://localhost:8000/docs](http://localhost:8000/docs)** in your browser to verify the interactive Swagger OpenAPI UI.
