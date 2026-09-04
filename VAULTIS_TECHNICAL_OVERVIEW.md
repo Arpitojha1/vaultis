@@ -11,7 +11,7 @@
 
 ## 1. One-Paragraph Summary
 
-**VAULTIS** is a secure, role-gated digital document management and evidentiary intelligence platform engineered specifically for legal proceedings and criminal investigations under Problem Statement **SIH26190** (*Secure Digital Document Management System for Legal and Investigation Documents*, Theme: *Blockchain & Cybersecurity*, Team: *zerosugar*). The system pairs a **FastAPI** backend with **PostgreSQL**, **ChromaDB**, and **Ollama** alongside a **React / TypeScript** frontend to solve the critical vulnerability of modern generative AI in high-stakes law enforcement: unauthorized information leakage during Retrieval-Augmented Generation (RAG). By cryptographically isolating raw files with on-disk **AES-256-GCM** encryption, enforcing strict chunk-level role-based access control (RBAC) in PostgreSQL *before* vector index retrieval occurs, and logging all operations to a sequential **SHA-256 tamper-evident hash chain**, VAULTIS guarantees that sensitive evidence (such as confidential informants, witness identities, and sealed Title III wiretaps) cannot be accessed, retrieved, or synthesized by an LLM unless the requesting actor possesses verified, non-cached legal clearance.
+**VAULTIS** is a secure, role-gated digital document management and evidentiary intelligence platform engineered specifically for legal proceedings and criminal investigations under Problem Statement **SIH26190** (*Secure Digital Document Management System for Legal and Investigation Documents*, Theme: *Blockchain & Cybersecurity*, Team: *zerosugar*). The system pairs a **FastAPI** backend with **PostgreSQL**, **ChromaDB**, and the **Groq API** alongside a **React / TypeScript** frontend to solve the critical vulnerability of modern generative AI in high-stakes law enforcement: unauthorized information leakage during Retrieval-Augmented Generation (RAG). By cryptographically isolating raw files with on-disk **AES-256-GCM** encryption, enforcing strict chunk-level role-based access control (RBAC) in PostgreSQL *before* vector index retrieval occurs, and logging all operations to a sequential **SHA-256 tamper-evident hash chain**, VAULTIS guarantees that sensitive evidence (such as confidential informants, witness identities, and sealed Title III wiretaps) cannot be accessed, retrieved, or synthesized by an LLM unless the requesting actor possesses verified, non-cached legal clearance.
 
 ---
 
@@ -93,11 +93,23 @@ flowchart TB
         PG[(PostgreSQL 16\nRelational Schema +\nPermission Truth +\nAudit Chain)]
         Chroma[(ChromaDB\nVector Search Index\nvaultis_chunks)]
         EncDisk[(Local Filesystem\nAES-256-GCM Encrypted PDFs\n./data/documents/{case_id}/*.aes)]
-        OllamaEngine["Ollama Service\nmistral:7b-instruct-q4_K_M\nEvidence Context Only"]
+        GroqEngine["Groq API\nllama-3.3-70b-versatile\nEvidence Context Only"]
     end
 
-    %% Client Interactions
-    UI_Auth --> API_Client
+    subgraph Frontend [Client Browser]
+        ReactUI["React / TypeScript\nAuth Context\nChat & Vault UI"]
+    end
+    
+    %% Relationships
+    ReactUI -- "1. Query (JWT)" --> Route_Query
+    Route_Query -- "2. Check Role" --> Auth_Middleware
+    Auth_Middleware -- "3. Validate" --> DB_Users
+    Auth_Middleware -- "4. Valid" --> Route_Query
+    
+    Route_Query -- "5. get_allowed_chunk_ids" --> DB_Perms
+    Route_Query -- "6. where $in: [ids]" --> Chroma
+    
+    Route_Query -- "7. Authorized Text" --> GroqEngine
     UI_Dash --> API_Client
     UI_Prep --> API_Client
     UI_Chat --> API_Client
@@ -118,7 +130,7 @@ flowchart TB
 
     Route_Query --> PG
     Route_Query --> Chroma
-    Route_Query --> OllamaEngine
+    Route_Query --> GroqEngine
     Route_Query --> Audit_Module
 
     Route_DocView --> PG
@@ -146,7 +158,7 @@ To illustrate the mechanics, consider a defense attorney submitting the question
 5. **Step 2: Vector Search (ChromaDB)**: In [rag.py:L150-158](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L150-L158), the system constructs:
    `where_clause = {"$and": [{"case_id": case_id}, {"chunk_id": {"$in": allowed_ids}}]}`
    ChromaDB performs nearest-neighbor vector search only within `allowed_ids`, returning up to 8 top matching chunks (`authorized_chunks`).
-6. **LLM Synthesis (Ollama)**: In [rag.py:L119-130](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L119-L130), `answer_with_ollama` formats the prompt containing **strictly** the text of the `authorized_chunks`. An asynchronous HTTP POST is dispatched to `http://localhost:11434/api/generate` running `mistral:7b-instruct-q4_K_M`.
+6. **LLM Synthesis (Groq)**: In [rag.py:L119-130](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L119-L130), `answer_with_groq` formats the prompt containing **strictly** the text of the `authorized_chunks`. An asynchronous HTTP POST is dispatched to `http://localhost:11434/api/generate` running `llama-3.3-70b-versatile`.
 7. **Immutable Audit Logging**: In [main.py:L101-102](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L101-L102), `append_record(db, "evidentiary_query", user.user_id, {"case_id": request.case_id, "question": request.question, "chunks_used": allowed_ids})` calculates the next SHA-256 block in the audit chain and commits to PostgreSQL.
 8. **Client Response**: The route returns `{ answer: string, authorized_chunks: list, filtered_chunks: list }`. The frontend renders the synthesized text in the main chat viewport, and renders the green authorized evidence cards and red filtered restriction warnings in the **Retrieval Gateway** side panel.
 
@@ -443,8 +455,8 @@ Once PostgreSQL produces the list of `allowed_ids`, ChromaDB is queried.
    ```
 ChromaDB’s HNSW indexing algorithm evaluates the `$in` constraint alongside the cosine similarity space. Chunks that do not exist in `allowed_ids` are omitted from the nearest-neighbor calculation.
 
-### Synthesis with Local LLM (Ollama)
-In `answer_with_ollama` ([rag.py:L119-130](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L119-L130)):
+### Synthesis with Groq API
+In `answer_with_groq` ([rag.py:L119-130](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L119-L130)):
 ```python
 context = "\n\n".join(f"[{i + 1}] {text}" for i, text in enumerate(authorized_text))
 prompt = f"Answer the legal case question using only this evidence context. If insufficient, say so.\n\nEvidence context:\n{context}\n\nQuestion: {question}"
@@ -699,7 +711,7 @@ The table below contrasts the features claimed in the pitch and architecture spe
 | **Document Ingestion Pipeline** | Upload $\rightarrow$ AES-256 encryption $\rightarrow$ text extraction/OCR $\rightarrow$ LangChain chunking $\rightarrow$ Chroma upsert | **FULLY WORKING** | Executed in [app/rag.py:L101-116](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L101-L116) and [app/main.py:L76-86](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L76-L86). |
 | **OCR Fallback for Scanned Evidence** | PyPDF extraction with fallback to pdf2image + pytesseract OCR | **FULLY WORKING** | Fully implemented in [app/rag.py:L64-99](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L64-L99). Container dependencies installed in [Dockerfile:L4](file:///c:/Users/Arpit/vaultis/backend/Dockerfile#L4). |
 | **Chunk-Level Sensitivity Tagging** | Chunks assigned `public`, `case_team`, or `sealed` with `disclosed_to_defense` boolean | **FULLY WORKING** | Model in [models.py:L40-47](file:///c:/Users/Arpit/vaultis/backend/app/models.py#L40-L47); populated during ingest in [rag.py:L115](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L115). |
-| **Pre-Retrieval Two-Step Query Pipeline** | Postgres `get_allowed_chunk_ids` $\rightarrow$ Chroma `$in` filter $\rightarrow$ Ollama synthesis $\rightarrow$ separated response | **FULLY WORKING** | Live SQL policy in [rag.py:L25-33](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L25-L33); vector boundary in [rag.py:L150-158](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L150-L158); route in [main.py:L89-104](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L89-L104). |
+| **Pre-Retrieval Two-Step Query Pipeline** | Postgres `get_allowed_chunk_ids` $\rightarrow$ Chroma `$in` filter $\rightarrow$ Groq synthesis $\rightarrow$ separated response | **FULLY WORKING** | Live SQL policy in [rag.py:L25-33](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L25-L33); vector boundary in [rag.py:L150-158](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L150-L158); route in [main.py:L89-104](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L89-L104). |
 | **On-Disk AES-256-GCM File Encryption** | Files encrypted before disk write with random 12-byte nonce | **FULLY WORKING** | Implemented via `AESGCM` in [app/rag.py:L43-46](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L43-L46). |
 | **Encryption Status Verification Endpoint** | Route confirms ciphertext does not start with `%PDF-` and returns SHA-256 hash | **FULLY WORKING** | Implemented in [main.py:L106-120](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L106-L120); verified in UI [PrepareWorkspace.tsx:L14](file:///c:/Users/Arpit/vaultis/frontend/src/components/PrepareWorkspace.tsx#L14). |
 | **Tamper-Evident SHA-256 Audit Chain** | Sequential chaining with `prev_hash` and live recomputed `verify_chain` | **FULLY WORKING** | Chaining in [audit.py:L41-54](file:///c:/Users/Arpit/vaultis/backend/app/audit.py#L41-L54); verification in [audit.py:L57-65](file:///c:/Users/Arpit/vaultis/backend/app/audit.py#L57-L65); route in [main.py:L242-246](file:///c:/Users/Arpit/vaultis/backend/app/main.py#L242-L246). |
@@ -723,7 +735,7 @@ The pitch deck for SIH26190 frames VAULTIS around three foundational pillars of 
 - **Technical Mechanism**: 
   - When an investigating officer ingests an informant debrief or wiretap transcript, it is tagged with `sensitivity_level = "sealed"`.
   - In [rag.py:L25-33](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L25-L33), the defense policy `policy = [ChunkPermission.sensitivity_level == "public"]` and `ChunkPermission.disclosed_to_defense.is_(True)` never includes `sealed` chunks.
-  - When defense counsel asks: *"Who provided the tip regarding the safehouse?"*, the chunk containing informant details is structurally omitted from `allowed_ids`. ChromaDB never searches it, and Ollama never sees it. The system responds that insufficient evidence exists, while rendering a security redaction warning under `filtered_chunks`.
+  - When defense counsel asks: *"Who provided the tip regarding the safehouse?"*, the chunk containing informant details is structurally omitted from `allowed_ids`. ChromaDB never searches it, and Groq never sees it. The system responds that insufficient evidence exists, while rendering a security redaction warning under `filtered_chunks`.
 
 ### 2. Provable Chain of Custody and Tamper Evidence for Legal Proceedings
 - **Deck Claim**: Evidence handling, judicial access, and disclosure events are cryptographically recorded in an immutable audit trail admissible under evidentiary standards (e.g., Section 65B of the Indian Evidence Act / Section 63 of the Bharatiya Sakshya Adhiniyam, 2023).
@@ -749,7 +761,7 @@ The table below examines the primary technical and operational risks identified 
 | Risk Identified in Pitch Deck | Codebase Handling / Mitigation | Audit Verdict & Residual Risk |
 |---|---|---|
 | **Stale Permissions Leak Data**<br>(User retains access after clearance revoked) | **Mitigated**: [rag.py:L25-33](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L25-L33) executes a fresh SQL query on every query. [auth.py:L28](file:///c:/Users/Arpit/vaultis/backend/app/auth.py#L28) verifies that the active JWT's role matches the user's live database row on every authenticated request. | **VERIFIED MITIGATION**: No permission caching exists. Revoking access in PostgreSQL immediately terminates access on the next HTTP request. |
-| **Adversarial Prompt Injection / Jailbreaking**<br>(AI tricked into bypassing role restrictions) | **Mitigated**: [rag.py:L150-158](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L150-L158) enforces filtering via ChromaDB's `$in` clause *before* LLM synthesis. Context sent to Ollama in [rag.py:L122](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L122) contains only authorized text. | **VERIFIED MITIGATION**: Structural immunity at the retrieval layer. The LLM cannot leak what it never receives. |
+| **Adversarial Prompt Injection / Jailbreaking**<br>(AI tricked into bypassing role restrictions) | **Mitigated**: [rag.py:L150-158](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L150-L158) enforces filtering via ChromaDB's `$in` clause *before* LLM synthesis. Context sent to Groq in [rag.py:L122](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L122) contains only authorized text. | **VERIFIED MITIGATION**: Structural immunity at the retrieval layer. The LLM cannot leak what it never receives. |
 | **Unauthorized File Tampering on Server Disk** | **Mitigated**: Raw files are encrypted with AES-256-GCM ([rag.py:L46](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L46)). Modifying ciphertext corrupts the 16-byte GCM authentication tag, causing `AESGCM.decrypt` to raise an `InvalidTag` exception on read ([rag.py:L57](file:///c:/Users/Arpit/vaultis/backend/app/rag.py#L57)). | **VERIFIED MITIGATION**: Authenticated encryption detects any bit-level tampering with on-disk evidence files. |
 | **Audit Ledger Modification by Database Admin** | **Partially Addressed**: [audit.py:L57-65](file:///c:/Users/Arpit/vaultis/backend/app/audit.py#L57-L65) detects unauthorized payload alterations via hash recomputation. | **RESIDUAL RISK**: Because the hash chain is stored inside the same PostgreSQL instance as the operational data, a database administrator who mutates a record could theoretically run a script to recalculate and overwrite all subsequent `prev_hash` and `record_hash` fields. Full tamper resistance requires writing hash roots to an external immutable ledger (e.g., Ethereum/Polygon, AWS QLDB, or a hardware security module). |
 | **Single Symmetric Encryption Key Compromise** | **Not Addressed**: `Settings.aes_256_key_b64` ([config.py:L18](file:///c:/Users/Arpit/vaultis/backend/app/config.py#L18)) configures a single static symmetric key across the entire application and all cases. | **RESIDUAL RISK**: Compromising this single environment variable exposes all encrypted files across all cases. Production deployment requires envelope encryption (KMS) generating unique Data Encryption Keys (DEKs) per case. |
