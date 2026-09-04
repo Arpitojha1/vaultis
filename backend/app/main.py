@@ -1,5 +1,7 @@
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+import io
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,10 +9,15 @@ from .audit import append_record, verify_chain
 from .auth import create_token, current_user, password_hash
 from .config import get_settings
 from .database import get_db
-from .models import AuditChain, Case, CaseAccess, Document, User
+from .models import AuditChain, Case, CaseAccess, ChunkPermission, Document, User
 import hashlib
 from pathlib import Path
-from .rag import ingest_document, retrieve_answer
+from .rag import (
+    decrypt_from_disk,
+    get_allowed_chunk_ids,
+    ingest_document,
+    retrieve_answer,
+)
 
 app = FastAPI(title="VAULTIS API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origin_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -24,6 +31,7 @@ class LoginRequest(BaseModel):
 class AnswerRequest(BaseModel):
     case_id: int
     question: str = Field(min_length=1, max_length=5000)
+    document_id: int | None = None
 
 
 class CreateCaseRequest(BaseModel):
@@ -83,7 +91,13 @@ async def answer_query(request: AnswerRequest, user: User = Depends(current_user
     permitted = db.scalar(select(CaseAccess).where(CaseAccess.case_id == request.case_id, CaseAccess.user_id == user.user_id))
     if not permitted:
         raise HTTPException(status_code=403, detail="No access to this case")
-    answer, authorized, filtered, allowed_ids = await retrieve_answer(db, request.case_id, user.role, request.question)
+
+    if request.document_id is not None:
+        document = db.get(Document, request.document_id)
+        if not document or document.case_id != request.case_id:
+            raise HTTPException(status_code=404, detail="Document not found in this case")
+            
+    answer, authorized, filtered, allowed_ids = await retrieve_answer(db, request.case_id, user.role, request.question, request.document_id)
     append_record(db, "evidentiary_query", user.user_id, {"case_id": request.case_id, "question": request.question, "chunks_used": allowed_ids})
     db.commit()
     return {"answer": answer, "authorized_chunks": authorized, "filtered_chunks": filtered}
@@ -105,6 +119,119 @@ def encryption_status(document_id: int, user: User = Depends(current_user), db: 
         raise HTTPException(status_code=500, detail="Document encryption integrity check failed")
     return {"document_id": document.document_id, "encrypted": True, "algorithm": "AES-256-GCM", "encrypted_file_hash_sha256": hashlib.sha256(encrypted_data).hexdigest(), "original_filename": document.filename}
 
+@app.get("/documents/{document_id}/view")
+def view_document(
+    document_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+
+    # 1. Check whether the document exists
+    document = db.get(Document, document_id)
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    # 2. Check whether the user can access the case
+    case_access = db.scalar(
+        select(CaseAccess).where(
+            CaseAccess.case_id == document.case_id,
+            CaseAccess.user_id == user.user_id,
+        )
+    )
+
+    if not case_access:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "No access to this case",
+                "document_id": document_id,
+            },
+        )
+
+    # 3. Get every chunk belonging to this document
+    document_chunks = db.scalars(
+        select(ChunkPermission).where(
+            ChunkPermission.document_id == document_id
+        )
+    ).all()
+
+    total_chunks = len(document_chunks)
+
+    # 4. Get the chunks this user's role is allowed to access
+    allowed_chunk_ids = set(
+        get_allowed_chunk_ids(
+            db,
+            document.case_id,
+            user.role,
+        )
+    )
+
+    authorized_chunks = sum(
+        1
+        for chunk in document_chunks
+        if chunk.chunk_id in allowed_chunk_ids
+    )
+
+    denied_chunks = total_chunks - authorized_chunks
+
+    # 5. The entire document can only be served
+    # if every chunk is authorized
+    if total_chunks == 0 or authorized_chunks != total_chunks:
+        append_record(db, "document_view_denied", user.user_id, {"document_id": document_id})
+        db.commit()
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "You do not have permission to view the complete document",
+                "document_id": document_id,
+                "total_chunks": total_chunks,
+                "authorized_chunks": authorized_chunks,
+                "denied_chunks": denied_chunks,
+            },
+        )
+
+    # 6. Find the encrypted document
+    encrypted_path = Path(document.encrypted_path)
+
+    if not encrypted_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Encrypted document file not found",
+        )
+
+    # 7. Decrypt the document
+    try:
+        document_data = decrypt_from_disk(encrypted_path)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to decrypt document",
+        ) from exc
+
+    # 8. Confirm this feature is serving a PDF
+    if not document_data.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=415,
+            detail="Document is not a PDF",
+        )
+
+    # 9. Return PDF for inline browser viewing
+    append_record(db, "document_view_granted", user.user_id, {"document_id": document_id})
+    db.commit()
+
+    return StreamingResponse(
+        io.BytesIO(document_data),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{document.filename}"'
+            )
+        },
+    )
 
 @app.get("/audit-events")
 def audit_events(user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[dict]:
