@@ -20,7 +20,22 @@ from .rag import (
 )
 
 app = FastAPI(title="VAULTIS API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origin_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+@app.on_event("startup")
+async def preload_model():
+    import httpx, asyncio
+    settings = get_settings()
+    async def _ping():
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                await client.post(
+                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                    json={"model": settings.ollama_model, "keep_alive": -1}
+                )
+        except Exception as e:
+            print(f"Failed to preload model: {e}")
+    asyncio.create_task(_ping())
 
 
 class LoginRequest(BaseModel):
@@ -71,6 +86,15 @@ def create_case(request: CreateCaseRequest, user: User = Depends(current_user), 
     append_record(db, "case_created", user.user_id, {"case_id": case.case_id, "case_number": case.case_number})
     db.commit()
     return {"case_id": case.case_id, "case_number": case.case_number, "title": case.title, "status": case.status}
+
+
+@app.get("/cases/{case_id}/documents")
+def list_documents(case_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[dict]:
+    permitted = db.scalar(select(CaseAccess).where(CaseAccess.case_id == case_id, CaseAccess.user_id == user.user_id))
+    if not permitted:
+        raise HTTPException(status_code=403, detail="No access to this case")
+    docs = db.scalars(select(Document).where(Document.case_id == case_id).order_by(Document.document_id)).all()
+    return [{"id": str(doc.document_id), "document_id": doc.document_id, "filename": doc.filename} for doc in docs]
 
 
 @app.post("/cases/{case_id}/documents")

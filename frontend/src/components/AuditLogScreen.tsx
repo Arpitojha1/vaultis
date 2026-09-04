@@ -1,2 +1,100 @@
-import { useEffect, useState } from 'react'; import { CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react'; import { api } from '../api/client'; import type { ApiAuditRecord } from '../types';
-export function AuditLogScreen() { const [records,setRecords]=useState<ApiAuditRecord[]>([]);const [result,setResult]=useState<{valid:boolean;records_checked:number;broken_at_record:number|null}|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const load=async()=>{setBusy(true);setError('');try{setRecords(await api.getAuditEvents())}catch(e){setError(e instanceof Error?e.message:'Unable to load audit events')}finally{setBusy(false)}};useEffect(()=>{void load()},[]);const verify=async()=>{setBusy(true);setError('');try{setResult(await api.verifyChain());await load()}catch(e){setError(e instanceof Error?e.message:'Unable to verify chain')}finally{setBusy(false)}};const tamper=async(id:number)=>{setBusy(true);setError('');try{await api.tamperEvent(id);await verify()}catch(e){setError(e instanceof Error?e.message:'Tamper demonstration unavailable')}finally{setBusy(false)}};return <div className="mx-auto max-w-6xl p-6"><div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-2xl font-bold">Tamper-evident audit chain</h1><p className="mt-1 text-sm text-slate-500">Events and verification are returned by the backend.</p></div><div className="flex gap-2"><button onClick={load} disabled={busy} className="rounded-lg border px-3 py-2 text-sm"><RefreshCw className="mr-1 inline w-4"/>Refresh</button><button onClick={verify} disabled={busy} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-bold text-white">Verify chain</button></div></div>{error&&<p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}{result&&<div className={`mt-5 flex gap-2 rounded-xl border p-4 text-sm ${result.valid?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-red-200 bg-red-50 text-red-800'}`}>{result.valid?<CheckCircle2 className="w-5"/>:<ShieldAlert className="w-5"/>}{result.valid?`Chain valid — ${result.records_checked} records verified.`:`Chain broken at record ${result.broken_at_record}.`}</div>}<div className="mt-6 space-y-3">{records.map(record=><article key={record.record_id} className="rounded-xl border bg-white p-4"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-bold">#{record.record_id} · {record.event_type}</p><p className="mt-1 text-xs text-slate-500">{new Date(record.timestamp).toLocaleString()} · actor {record.actor_user_id ?? 'system'}</p></div><span className="font-mono text-xs text-slate-500">{record.record_hash.slice(0,18)}…</span></div><pre className="mt-3 overflow-auto rounded bg-slate-50 p-2 text-xs text-slate-600">{JSON.stringify(record.payload,null,2)}</pre><button onClick={()=>tamper(record.record_id)} disabled={busy} className="mt-3 text-xs font-semibold text-rose-700 underline">Run enabled tamper demo</button></article>)}{!records.length&&!busy&&<p className="text-center text-slate-500">No audit records are available.</p>}</div></div> }
+import { useEffect, useState } from 'react'; 
+import { CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react'; 
+import { api } from '../api/client'; 
+import type { ApiAuditRecord } from '../types';
+
+export function AuditLogScreen() { 
+  const [records,setRecords]=useState<ApiAuditRecord[]>([]);
+  const [result,setResult]=useState<{valid:boolean;records_checked:number;broken_at_record:number|null}|null>(null);
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  
+  const load=async()=>{
+    setBusy(true);
+    setError('');
+    try{
+      setRecords(await api.getAuditEvents())
+    }catch(e){
+      setError(e instanceof Error?e.message:'Unable to load audit events')
+    }finally{
+      setBusy(false)
+    }
+  };
+  
+  useEffect(()=>{void load()},[]);
+  
+  const verify=async()=>{
+    setBusy(true);
+    setError('');
+    try{
+      setResult(await api.verifyChain());
+      await load()
+    }catch(e){
+      setError(e instanceof Error?e.message:'Unable to verify chain')
+    }finally{
+      setBusy(false)
+    }
+  };
+  
+  const tamper=async(id:number)=>{
+    setBusy(true);
+    setError('');
+    try{
+      await api.tamperEvent(id);
+      await verify()
+    }catch(e){
+      setError(e instanceof Error?e.message:'Tamper demonstration unavailable')
+    }finally{
+      setBusy(false)
+    }
+  };
+  
+  return (
+    <div className="mx-auto max-w-6xl p-6">
+      <div className="flex flex-wrap justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Tamper-evident audit chain</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Events and verification are returned by the backend.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={load} disabled={busy} className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
+            <RefreshCw className="mr-1 inline w-4"/>Refresh
+          </button>
+          <button onClick={verify} disabled={busy} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-bold text-white hover:bg-blue-800 transition-colors disabled:opacity-50">
+            Verify chain
+          </button>
+        </div>
+      </div>
+      
+      {error && <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-900/30 dark:text-red-400">{error}</p>}
+      
+      {result && (
+        <div className={`mt-5 flex gap-2 rounded-xl border p-4 text-sm transition-colors ${result.valid?'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-400':'border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400'}`}>
+          {result.valid ? <CheckCircle2 className="w-5"/> : <ShieldAlert className="w-5"/>}
+          {result.valid ? `Chain valid — ${result.records_checked} records verified.` : `Chain broken at record ${result.broken_at_record}.`}
+        </div>
+      )}
+      
+      <div className="mt-6 space-y-3">
+        {records.map(record=>(
+          <article key={record.record_id} className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 p-4 transition-colors">
+            <div className="flex flex-wrap justify-between gap-3">
+              <div>
+                <p className="font-bold text-slate-900 dark:text-white">#{record.record_id} · {record.event_type}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{new Date(record.timestamp).toLocaleString()} · actor {record.actor_user_id ?? 'system'}</p>
+              </div>
+              <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{record.record_hash.slice(0,18)}…</span>
+            </div>
+            <pre className="mt-3 overflow-auto rounded bg-slate-50 dark:bg-slate-950 p-2 text-xs text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-800">
+              {JSON.stringify(record.payload,null,2)}
+            </pre>
+            <button onClick={()=>tamper(record.record_id)} disabled={busy} className="mt-3 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 underline transition-colors disabled:opacity-50">
+              Run enabled tamper demo
+            </button>
+          </article>
+        ))}
+        {!records.length && !busy && <p className="text-center text-slate-500 dark:text-slate-400">No audit records are available.</p>}
+      </div>
+    </div>
+  );
+}

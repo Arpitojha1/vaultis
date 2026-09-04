@@ -9,13 +9,9 @@ services:
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vaultis -d vaultis"]
-      interval: 5s
       timeout: 5s
       retries: 10
-  ollama:
-    image: ollama/ollama:latest
-    ports: ["11434:11434"]
-    volumes: ["ollama_data:/root/.ollama"]
+
   api:
     build: .
     env_file: ./.env
@@ -32,6 +28,5 @@ services:
       - documents_data:/data/documents
 volumes:
   postgres_data:
-  ollama_data:
   chroma_data:
   documents_data:

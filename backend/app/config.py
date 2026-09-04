@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     document_storage_path: Path = Path("./data/documents")
     aes_256_key_b64: str = Field(...)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "mistral:7b-instruct-q4_K_M"
+    ollama_model: str = "deepseek-r1:8b"
     enable_tamper_demo_endpoint: bool = False
 
     @property
