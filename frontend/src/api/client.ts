@@ -26,6 +26,7 @@ async function request(path: string, options: RequestInit = {}) {
 export const api = {
   login: (username: string, password: string) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   getCases: () => request('/cases'),
+  getDocuments: (caseId: number) => request(`/cases/${caseId}/documents`),
   createCase: (data: { case_number: string; title: string }) => request('/cases', { method: 'POST', body: JSON.stringify(data) }),
   uploadDocument: (caseId: number, file: File, sensitivityLevel?: string) => {
     const form = new FormData(); form.append('file', file);
