@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     chroma_path: Path = Path("./data/chroma")
     document_storage_path: Path = Path("./data/documents")
-    aes_256_key_b64: str = Field(...)
+    aes_256_key_b64: str = Field(..., validation_alias=AliasChoices("AES_256_KEY_B64", "AES_ENCRYPTION_KEY"))
+
     groq_api_key: str = Field(...)
     groq_model: str = "llama-3.3-70b-versatile"
     enable_tamper_demo_endpoint: bool = False
