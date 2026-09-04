@@ -1,2 +1,50 @@
-import { useState, type FormEvent } from 'react'; import { LockKeyhole, Shield } from 'lucide-react';
-export function LandingAuth({ onLogin, error }: { onLogin: (username: string, password: string) => Promise<void>; error: string }) { const [username,setUsername]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const submit=async(e:FormEvent)=>{e.preventDefault();setBusy(true);try{await onLogin(username,password)}finally{setBusy(false)}}; return <div className="min-h-screen bg-slate-950 text-white grid place-items-center p-4"><div className="grid max-w-5xl gap-10 lg:grid-cols-2"><section className="self-center"><div className="flex items-center gap-3 text-blue-400"><Shield className="w-9 h-9"/><span className="font-bold tracking-widest">VAULTIS</span></div><h1 className="mt-6 text-4xl font-bold leading-tight">Permission-checked evidence, before AI sees it.</h1><p className="mt-4 text-slate-400">A cryptographically audited case vault with server-enforced retrieval controls.</p></section><form onSubmit={submit} className="rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-2xl"><LockKeyhole className="text-blue-400"/><h2 className="mt-4 text-xl font-bold">Secure vault sign in</h2><p className="mt-1 text-sm text-slate-400">Your authenticated server role determines access.</p>{error&&<p className="mt-4 rounded bg-red-950 p-3 text-sm text-red-300">{error}</p>}<label className="mt-5 block text-sm">Username<input required autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 p-2.5"/></label><label className="mt-4 block text-sm">Password<input required type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 p-2.5"/></label><button disabled={busy} className="mt-6 w-full rounded-lg bg-blue-600 p-2.5 font-bold disabled:opacity-50">{busy?'Signing in…':'Sign in'}</button></form></div></div> }
+import { useState, type FormEvent } from 'react'; import { LockKeyhole, Shield, ArrowLeft } from 'lucide-react';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+export function LandingAuth({ onLogin, error, onBack }: { onLogin: (username: string, password: string) => Promise<void>; error: string; onBack: () => void }) {
+  const [username,setUsername]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const submit=async(e:FormEvent)=>{e.preventDefault();setBusy(true);try{await onLogin(username,password)}finally{setBusy(false)}}; 
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center p-4">
+      <div className="w-full max-w-md">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-8 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to home
+        </button>
+        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+          <div className="flex items-center gap-3 text-slate-900 mb-8">
+            <Shield className="w-8 h-8" strokeWidth={1.5} />
+            <span className="font-semibold tracking-wide text-lg">VAULTIS</span>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Client Portal</h1>
+          <p className="mt-2 text-slate-600">Sign in to access your secure case vault.</p>
+          
+          <form onSubmit={submit} className="mt-8 space-y-5">
+            {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600 border border-red-100">{error}</p>}
+            
+            <Input 
+              label="Username" 
+              required 
+              autoComplete="username" 
+              value={username} 
+              onChange={e=>setUsername(e.target.value)} 
+            />
+            
+            <Input 
+              label="Password" 
+              type="password" 
+              required 
+              autoComplete="current-password" 
+              value={password} 
+              onChange={e=>setPassword(e.target.value)} 
+            />
+            
+            <div className="pt-2">
+              <Button type="submit" fullWidth disabled={busy}>
+                {busy ? 'Signing in…' : 'Sign in'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
