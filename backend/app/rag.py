@@ -3,7 +3,8 @@ import base64
 import os
 from pathlib import Path
 from uuid import uuid4
-import httpx
+import groq
+from groq import AsyncGroq
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException, UploadFile
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -121,8 +122,6 @@ async def answer_with_groq(question: str, authorized_text: list[str]) -> str:
     context = "\n\n".join(f"[{i + 1}] {text}" for i, text in enumerate(authorized_text))
     prompt = f"Answer the legal case question using only this evidence context. If insufficient, say so.\n\nEvidence context:\n{context}\n\nQuestion: {question}"
     settings = get_settings()
-    import groq
-    from groq import AsyncGroq
     try:
         client = AsyncGroq(api_key=settings.groq_api_key, timeout=60.0)
         response = await client.chat.completions.create(
