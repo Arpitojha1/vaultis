@@ -23,6 +23,18 @@ async function request(path: string, options: RequestInit = {}) {
   return response.json();
 }
 
+async function requestRaw(path: string, options: RequestInit = {}) {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...options.headers,
+    },
+  });
+  if (response.status === 401) unauthorizedHandler?.();
+  return response;
+}
+
 export const api = {
   login: (username: string, password: string) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   getCases: () => request('/cases'),
@@ -37,4 +49,5 @@ export const api = {
   verifyChain: () => request('/verify-chain', { method: 'POST' }),
   tamperEvent: (recordId: number) => request(`/audit-events/${recordId}/tamper`, { method: 'POST' }),
   getEncryptionStatus: (documentId: number) => request(`/documents/${documentId}/encryption-status`),
+  getDocumentView: (documentId: string) => requestRaw(`/documents/${documentId}/view`),
 };
