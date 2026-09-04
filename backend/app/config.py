@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     chroma_path: Path = Path("./data/chroma")
     document_storage_path: Path = Path("./data/documents")
     aes_256_key_b64: str = Field(...)
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "mistral:7b-instruct-q4_K_M"
+    groq_api_key: str = Field(...)
+    groq_model: str = "llama-3.3-70b-versatile"
     enable_tamper_demo_endpoint: bool = False
 
     @property
