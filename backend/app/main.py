@@ -27,6 +27,9 @@ class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
 
+class VerifyMFARequest(BaseModel):
+    challenge_token: str
+    code: str
 
 class AnswerRequest(BaseModel):
     case_id: int
@@ -49,7 +52,35 @@ def login(request: LoginRequest, db: Session = Depends(get_db)) -> dict:
     user = db.scalar(select(User).where(User.username == request.username))
     if not user or not password_hash.verify(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+    if user.mfa_enabled:
+        from .auth import create_mfa_challenge_token
+        return {"mfa_required": True, "challenge_token": create_mfa_challenge_token(user)}
+
     append_record(db, "auth_login", user.user_id, {"username": user.username, "role": user.role})
+    db.commit()
+    return {"token": create_token(user), "user": {"user_id": user.user_id, "username": user.username, "role": user.role}}
+
+@app.post("/auth/verify-mfa")
+def verify_mfa(request: VerifyMFARequest, db: Session = Depends(get_db)) -> dict:
+    import jwt
+    import pyotp
+    from .config import get_settings
+    try:
+        payload = jwt.decode(request.challenge_token, get_settings().jwt_secret, algorithms=["HS256"])
+        user_id = int(payload["mfa_user_id"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired challenge token")
+        
+    user = db.get(User, user_id)
+    if not user or not user.mfa_enabled or not user.totp_secret:
+        raise HTTPException(status_code=400, detail="MFA not enabled for user")
+        
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(request.code):
+        raise HTTPException(status_code=401, detail="Invalid MFA code")
+
+    append_record(db, "auth_login", user.user_id, {"username": user.username, "role": user.role, "mfa_used": True})
     db.commit()
     return {"token": create_token(user), "user": {"user_id": user.user_id, "username": user.username, "role": user.role}}
 
@@ -79,7 +110,21 @@ def list_documents(case_id: int, user: User = Depends(current_user), db: Session
     if not permitted:
         raise HTTPException(status_code=403, detail="No access to this case")
     docs = db.scalars(select(Document).where(Document.case_id == case_id).order_by(Document.document_id)).all()
-    return [{"id": str(doc.document_id), "document_id": doc.document_id, "filename": doc.filename} for doc in docs]
+    
+    result = []
+    for doc in docs:
+        chunks = db.scalars(select(ChunkPermission.sensitivity_level).where(ChunkPermission.document_id == doc.document_id)).all()
+        breakdown = {}
+        for level in chunks:
+            breakdown[level] = breakdown.get(level, 0) + 1
+        result.append({
+            "id": str(doc.document_id),
+            "document_id": doc.document_id,
+            "filename": doc.filename,
+            "created_at": doc.created_at.isoformat() if doc.created_at else None,
+            "sensitivity_breakdown": breakdown
+        })
+    return result
 
 
 @app.post("/cases/{case_id}/documents")

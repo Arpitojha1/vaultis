@@ -98,6 +98,7 @@ The database was initialized by `seed.py` with 4 demo accounts:
 
 1. Go to **[http://localhost:3000](http://localhost:3000)**.
 2. Sign in as `investigator` / `investigator-demo`.
+   > **Note**: Demo accounts now have MFA enabled. The setup process generates a random TOTP secret for each demo account and prints it to the backend console. Check the backend logs (`docker compose logs api` or the python console) for the TOTP secret, and enter it in your authenticator app, or use a script to generate the 6-digit code.
 3. Verify you see the operator banner (`investigator · investigating officer`) and 3 seeded cases:
    - `CR-2026-8841` (*State v. Sterling Financial Syndicate*)
    - `INV-2026-0419` (*Operation Dark Harbor*)

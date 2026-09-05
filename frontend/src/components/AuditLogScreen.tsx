@@ -138,9 +138,11 @@ export function AuditLogScreen() {
                     <div className="font-mono text-[10px] text-slate-400">
                       Prev: {record.prev_hash === '0000000000000000000000000000000000000000000000000000000000000000' ? 'Genesis' : record.prev_hash.slice(0, 12) + '...'}
                     </div>
-                    <button onClick={()=>tamper(record.record_id)} disabled={busy} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
-                      Tamper payload
-                    </button>
+                    {import.meta.env.VITE_ENABLE_TAMPER_DEMO === 'true' && (
+                      <button onClick={()=>tamper(record.record_id)} disabled={busy} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
+                        Tamper payload
+                      </button>
+                    )}
                   </div>
                 </div>
               </article>

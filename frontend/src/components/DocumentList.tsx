@@ -5,6 +5,8 @@ import { FileText, MessageSquare, Eye } from 'lucide-react';
 type Document = {
   id: string;
   filename: string;
+  created_at?: string | null;
+  sensitivity_breakdown?: Record<string, number>;
 };
 
 export function DocumentList({ caseId, onOpenDocChat, onViewDoc }: { caseId: number; onOpenDocChat: (docId: string, filename: string) => void; onViewDoc: (docId: string) => void }) {
@@ -14,7 +16,6 @@ export function DocumentList({ caseId, onOpenDocChat, onViewDoc }: { caseId: num
 
   useEffect(() => {
     let mounted = true;
-    // TODO(verify): confirm response shape against backend once available
     api.getDocuments(caseId)
       .then((res: Document[]) => {
         if (mounted) {
@@ -42,23 +43,39 @@ export function DocumentList({ caseId, onOpenDocChat, onViewDoc }: { caseId: num
       {!loading && documents.length > 0 && (
         <div className="flex flex-col gap-4">
           {documents.map(doc => (
-            <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200">
-              <div className="flex items-center gap-3">
-                <FileText className="text-slate-700" strokeWidth={1.5} />
-                <span className="font-medium text-slate-900">{doc.filename}</span>
+            <div key={doc.id} className="flex flex-col gap-4 p-4 bg-white rounded-xl border border-slate-200 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  <FileText className="text-slate-700" strokeWidth={1.5} />
+                  <span className="font-medium text-slate-900">{doc.filename}</span>
+                </div>
+                {doc.created_at && (
+                  <div className="text-xs text-slate-500">
+                    Added: {new Date(doc.created_at).toLocaleString()}
+                  </div>
+                )}
+                {doc.sensitivity_breakdown && Object.keys(doc.sensitivity_breakdown).length > 0 && (
+                  <div className="flex gap-2 mt-1">
+                    {Object.entries(doc.sensitivity_breakdown).map(([level, count]) => (
+                      <span key={level} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                        {level}: {count} chunks
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => onViewDoc(doc.id)}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
                 >
-                  <Eye className="w-4 h-4" strokeWidth={1.5} /> View
+                  <Eye className="w-4 h-4" strokeWidth={1.5} /> Open
                 </button>
                 <button
                   onClick={() => onOpenDocChat(doc.id, doc.filename)}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors"
                 >
-                  <MessageSquare className="w-4 h-4" strokeWidth={1.5} /> Chat about this
+                  <MessageSquare className="w-4 h-4" strokeWidth={1.5} /> Ask about this document
                 </button>
               </div>
             </div>

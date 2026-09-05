@@ -37,6 +37,7 @@ async function requestRaw(path: string, options: RequestInit = {}) {
 
 export const api = {
   login: (username: string, password: string) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  verifyMfa: (challengeToken: string, code: string) => request('/auth/verify-mfa', { method: 'POST', body: JSON.stringify({ challenge_token: challengeToken, code }) }),
   getCases: () => request('/cases'),
   getDocuments: (caseId: number) => request(`/cases/${caseId}/documents`),
   createCase: (data: { case_number: string; title: string }) => request('/cases', { method: 'POST', body: JSON.stringify(data) }),
