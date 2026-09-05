@@ -12,6 +12,7 @@ from app.auth import password_hash
 from app.database import SessionLocal
 from app.models import AuditChain, Case, CaseAccess, ChunkPermission, Document, User
 from app.rag import get_chroma_collection
+from app.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ _DEMO_ROLE_KEYS = [
     ("PROSECUTOR", "prosecutor",     "prosecutor-demo",   "prosecutor"),
     ("DEFENSE",    "defense",        "defense-demo",      "defense_lawyer"),
     ("JUDGE",      "judge",          "judge-demo",        "judge"),
+    ("NEWUSER",    "newuser_demo",   "ChangeMe_New_2026!", "investigating_officer"),
 ]
 
 USERS = [
@@ -70,7 +72,7 @@ def main() -> None:
                 if not user:
                     import pyotp
                     totp_secret = pyotp.random_base32()
-                    user = User(username=username, password_hash=password_hash.hash(password), role=role, mfa_enabled=True, totp_secret=totp_secret)
+                    user = User(username=username, password_hash=password_hash.hash(password), role=role, mfa_enabled=False, totp_secret=totp_secret)
                     db.add(user)
                     db.flush()
                     print(f"Created demo user: {username} | Password: {password} | TOTP Secret: {totp_secret}")
@@ -90,7 +92,10 @@ def main() -> None:
                 case = Case(case_number=number, title=title, status=status)
                 db.add(case)
                 db.flush()
-            for user in users.values():
+            newuser_username = _get_env("DEMO_NEWUSER_USERNAME", "newuser_demo")
+            for username, user in users.items():
+                if username == newuser_username:
+                    continue
                 if not db.scalar(select(CaseAccess).where(CaseAccess.case_id == case.case_id, CaseAccess.user_id == user.user_id)):
                     db.add(CaseAccess(case_id=case.case_id, user_id=user.user_id))
             if not db.scalar(select(Document).where(Document.case_id == case.case_id)):

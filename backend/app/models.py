@@ -54,6 +54,6 @@ class AuditChain(Base):
     event_type: Mapped[str] = mapped_column(String(80), nullable=False)
     actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    timestamp: Mapped[str] = mapped_column(String(100), nullable=False)
     prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     record_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
