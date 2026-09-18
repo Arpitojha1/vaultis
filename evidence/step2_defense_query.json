@@ -1,0 +1,18 @@
+{
+  "step": "2_defense_query",
+  "timestamp": "2026-09-18T21:55:28.051164+00:00",
+  "question": "Summarize the witness statements related to the incident timeline.",
+  "authorized_chunk_ids": [
+    "doc1_chunk0",
+    "doc1_chunk1",
+    "doc1_chunk2"
+  ],
+  "filtered_chunk_ids": [
+    "doc2_chunk0",
+    "doc2_chunk1"
+  ],
+  "authorized_chunk_count": 3,
+  "filtered_count": 2,
+  "answer_preview": "Based on the available public statements, the incident timeline...",
+  "_note": "STUBBED - not valid evidence for the Groq claim. Local environment lacked pip dependencies."
+}

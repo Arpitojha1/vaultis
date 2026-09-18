@@ -1,0 +1,25 @@
+{
+  "case_id": 1,
+  "case_number": "DEMO-2026-0001",
+  "canary_string": "ZZ-CANARY-7731",
+  "public_chunks": {
+    "document_id": 1,
+    "chunk_ids": [
+      "doc1_chunk0",
+      "doc1_chunk1",
+      "doc1_chunk2"
+    ],
+    "sensitivity_level": "public",
+    "disclosed_to_defense": true
+  },
+  "case_team_chunks": {
+    "document_id": 2,
+    "chunk_ids": [
+      "doc2_chunk0",
+      "doc2_chunk1"
+    ],
+    "sensitivity_level": "case_team",
+    "disclosed_to_defense": false
+  },
+  "_note": "STUBBED - not valid evidence for the Groq claim. Local environment lacked pip dependencies."
+}

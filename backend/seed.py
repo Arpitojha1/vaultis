@@ -75,7 +75,7 @@ def main() -> None:
                     user = User(username=username, password_hash=password_hash.hash(password), role=role, mfa_enabled=False, totp_secret=totp_secret)
                     db.add(user)
                     db.flush()
-                    print(f"Created demo user: {username} | Password: {password} | TOTP Secret: {totp_secret}")
+                    print(f"Created demo user: {username} (role={role})")
                 users[username] = user
         else:
             logger.info("DEMO_ACCOUNTS_ENABLED=false — skipping demo user creation")

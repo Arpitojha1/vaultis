@@ -8,13 +8,20 @@ export function AuditLogScreen() {
   const [result,setResult]=useState<{valid:boolean;records_checked:number;broken_at_record:number|null}|null>(null);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  const [demoEnabled,setDemoEnabled]=useState(false);
   
   const load=async()=>{
     setBusy(true);setError('');
     try{
       const data = await api.getAuditEvents();
-      // Ensure data is an array
       setRecords(Array.isArray(data) ? data : (data as any).items || []);
+      
+      try {
+        const demoRes = await api.getDemoStatus();
+        setDemoEnabled(demoRes.tamper_demo_enabled === true);
+      } catch (demoErr) {
+        setDemoEnabled(false);
+      }
     }catch(e){
       setError(e instanceof Error?e.message:'Unable to load audit events');
     }finally{
@@ -138,7 +145,7 @@ export function AuditLogScreen() {
                     <div className="font-mono text-[10px] text-slate-400">
                       Prev: {record.prev_hash === '0000000000000000000000000000000000000000000000000000000000000000' ? 'Genesis' : record.prev_hash.slice(0, 12) + '...'}
                     </div>
-                    {import.meta.env.VITE_ENABLE_TAMPER_DEMO === 'true' && (
+                    {demoEnabled && (
                       <button onClick={()=>tamper(record.record_id)} disabled={busy} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
                         Tamper payload
                       </button>

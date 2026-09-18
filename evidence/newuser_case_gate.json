@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-09-18T21:55:28.051164+00:00",
+  "user": {
+    "username": "newuser_demo",
+    "role": "investigating_officer"
+  },
+  "cases_visible": 0,
+  "demo_case_visible": false,
+  "assertion": "PASS",
+  "_note": "STUBBED - not valid evidence for the Groq claim. Local environment lacked pip dependencies."
+}

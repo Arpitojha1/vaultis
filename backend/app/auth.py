@@ -6,7 +6,8 @@ from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .database import get_db
-from .models import User
+from .models import User, RevokedToken
+import uuid
 
 password_hash = PasswordHash.recommended()
 bearer = HTTPBearer()
@@ -14,7 +15,8 @@ bearer = HTTPBearer()
 
 def create_token(user: User) -> str:
     settings = get_settings()
-    payload = {"user_id": user.user_id, "role": user.role, "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes)}
+    jti = uuid.uuid4().hex
+    payload = {"jti": jti, "user_id": user.user_id, "role": user.role, "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes)}
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
@@ -24,16 +26,26 @@ def create_mfa_challenge_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
-def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)) -> User:
+def current_user_and_token(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)) -> tuple[User, str]:
     try:
         payload = jwt.decode(credentials.credentials, get_settings().jwt_secret, algorithms=["HS256"])
         user_id = int(payload["user_id"])
+        jti = payload.get("jti")
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        
+    if jti:
+        if db.get(RevokedToken, jti):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
+            
     user = db.get(User, user_id)
     if not user or user.role != payload.get("role"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
-    return user
+    return user, jti
+
+
+def current_user(auth: tuple[User, str] = Depends(current_user_and_token)) -> User:
+    return auth[0]
 
 
 def require_role(*roles: str):

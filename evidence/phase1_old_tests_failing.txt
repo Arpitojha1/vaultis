@@ -1,0 +1,88 @@
+﻿python : C:\Users\Arpit\AppData\Roaming\Python\Python313\site-packages\requests\__init__.py:113: 
+RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.2)/charset_normalizer (3.4.4) doesn't match a supported 
+version!
+At line:1 char:76
++ ... is\backend; python -m pytest tests/test_security_contract.py -v 2>&1  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\Arpit\...ported version!:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  warnings.warn(
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Program Files\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Arpit\vaultis\backend
+plugins: anyio-4.14.0, langsmith-0.10.5, asyncio-1.4.0, typeguard-4.5.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 2 items
+
+tests/test_security_contract.py::test_hash_is_deterministic_for_reordered_payload_keys FAILED [ 50%]
+tests/test_security_contract.py::test_hash_changes_when_payload_changes FAILED [100%]
+
+================================== FAILURES ===================================
+____________ test_hash_is_deterministic_for_reordered_payload_keys ____________
+
+    def test_hash_is_deterministic_for_reordered_payload_keys():
+        timestamp = datetime(2026, 9, 3, tzinfo=timezone.utc)
+>       assert compute_hash("test_event", 1, {"b": 2, "a": 1}, GENESIS_HASH, timestamp) == compute_hash("test_event", 1, {"a": 1, "b": 2}, GENESIS_HASH, timestamp)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_security_contract.py:7: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+event_type = 'test_event', actor_user_id = 1, payload = {'b': 2, 'a': 1}
+prev_hash = '0000000000000000000000000000000000000000000000000000000000000000'
+timestamp = datetime.datetime(2026, 9, 3, 0, 0, tzinfo=datetime.timezone.utc)
+
+    def compute_hash(
+        event_type: str,
+        actor_user_id: int | None,
+        payload: dict,
+        prev_hash: str,
+        timestamp: str,
+    ) -> str:
+        material = (
+>           event_type
+            + str(actor_user_id)
+            + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            + prev_hash
+            + timestamp
+        )
+E       TypeError: can only concatenate str (not "datetime.datetime") to str
+
+app\audit.py:19: TypeError
+___________________ test_hash_changes_when_payload_changes ____________________
+
+    def test_hash_changes_when_payload_changes():
+        timestamp = datetime(2026, 9, 3, tzinfo=timezone.utc)
+>       assert compute_hash("test_event", 1, {"event": "query"}, GENESIS_HASH, timestamp) != compute_hash("test_event", 1, {"event": "tampered"}, GENESIS_HASH, timestamp)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_security_contract.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+event_type = 'test_event', actor_user_id = 1, payload = {'event': 'query'}
+prev_hash = '0000000000000000000000000000000000000000000000000000000000000000'
+timestamp = datetime.datetime(2026, 9, 3, 0, 0, tzinfo=datetime.timezone.utc)
+
+    def compute_hash(
+        event_type: str,
+        actor_user_id: int | None,
+        payload: dict,
+        prev_hash: str,
+        timestamp: str,
+    ) -> str:
+        material = (
+>           event_type
+            + str(actor_user_id)
+            + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            + prev_hash
+            + timestamp
+        )
+E       TypeError: can only concatenate str (not "datetime.datetime") to str
+
+app\audit.py:19: TypeError
+=========================== short test summary info ===========================
+FAILED tests/test_security_contract.py::test_hash_is_deterministic_for_reordered_payload_keys
+FAILED tests/test_security_contract.py::test_hash_changes_when_payload_changes
+============================== 2 failed in 0.96s ==============================

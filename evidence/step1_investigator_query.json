@@ -1,0 +1,16 @@
+{
+  "step": "1_investigator_query",
+  "timestamp": "2026-09-18T21:55:28.051164+00:00",
+  "question": "Summarize the witness statements related to the incident timeline.",
+  "authorized_chunk_ids": [
+    "doc1_chunk0",
+    "doc1_chunk1",
+    "doc1_chunk2",
+    "doc2_chunk0",
+    "doc2_chunk1"
+  ],
+  "authorized_chunk_count": 5,
+  "filtered_count": 0,
+  "answer_preview": "The incident timeline begins on July 15 with an internal report...",
+  "_note": "STUBBED - not valid evidence for the Groq claim. Local environment lacked pip dependencies."
+}

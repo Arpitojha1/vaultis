@@ -1,0 +1,39 @@
+﻿python : C:\Users\Arpit\AppData\Roaming\Python\Python313\site-packages\requests\__init__.py:113: 
+RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.2)/charset_normalizer (3.4.4) doesn't match a supported 
+version!
+At line:1 char:76
++ ... is\backend; python -m pytest tests/ -v --ignore=tests/__pycache__ 2>& ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\Arpit\...ported version!:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  warnings.warn(
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Program Files\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Arpit\vaultis\backend
+plugins: anyio-4.14.0, langsmith-0.10.5, asyncio-1.4.0, typeguard-4.5.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 19 items
+
+tests/test_audit_chain.py::TestComputeHash::test_deterministic_for_reordered_keys PASSED [  5%]
+tests/test_audit_chain.py::TestComputeHash::test_changes_when_payload_changes PASSED [ 10%]
+tests/test_audit_chain.py::TestComputeHash::test_changes_when_timestamp_changes PASSED [ 15%]
+tests/test_audit_chain.py::TestComputeHash::test_none_actor_user_id PASSED [ 21%]
+tests/test_audit_chain.py::TestComputeHash::test_timestamp_must_be_string PASSED [ 26%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_single_record_chain_verifies PASSED [ 31%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_multi_record_chain_verifies PASSED [ 36%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_tampered_payload_detected PASSED [ 42%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_tampered_first_record_detected PASSED [ 47%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_tampered_last_record_detected PASSED [ 52%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_deleted_middle_record_detected PASSED [ 57%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_truncated_tail_not_detected PASSED [ 63%]
+tests/test_audit_chain.py::TestChainWithSQLite::test_empty_chain_verifies PASSED [ 68%]
+tests/test_audit_chain.py::TestChainWithPostgreSQL::test_single_record_roundtrip SKIPPED [ 73%]
+tests/test_audit_chain.py::TestChainWithPostgreSQL::test_multi_record_roundtrip SKIPPED [ 78%]
+tests/test_audit_chain.py::TestChainWithPostgreSQL::test_payload_survives_roundtrip SKIPPED [ 84%]
+tests/test_audit_chain.py::TestChainWithPostgreSQL::test_tamper_detected_at_exact_record SKIPPED [ 89%]
+tests/test_security_contract.py::test_hash_is_deterministic_for_reordered_payload_keys PASSED [ 94%]
+tests/test_security_contract.py::test_hash_changes_when_payload_changes PASSED [100%]
+
+======================== 15 passed, 4 skipped in 0.76s ========================

@@ -57,3 +57,9 @@ class AuditChain(Base):
     timestamp: Mapped[str] = mapped_column(String(100), nullable=False)
     prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     record_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+    token_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

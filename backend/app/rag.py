@@ -26,12 +26,25 @@ def get_chroma_collection():
 def get_allowed_chunk_ids(db: Session, case_id: int, user_role: str) -> list[str]:
     """Permission truth is freshly selected from PostgreSQL for every query."""
     permitted_team_roles = ("investigating_officer", "prosecutor", "judge")
+    # Base security boundary: nobody can see sealed chunks via RAG
+    base_filter = and_(
+        ChunkPermission.case_id == case_id,
+        ChunkPermission.sensitivity_level != "sealed"
+    )
+
     policy = [ChunkPermission.sensitivity_level == "public"]
     if user_role in permitted_team_roles:
-        policy.append(ChunkPermission.sensitivity_level.in_(("public", "case_team")))
+        policy.append(ChunkPermission.sensitivity_level == "case_team")
     if user_role == "defense_lawyer":
-        policy.append(ChunkPermission.disclosed_to_defense.is_(True))
-    return list(db.scalars(select(ChunkPermission.chunk_id).where(ChunkPermission.case_id == case_id, or_(*policy))).all())
+        policy.append(and_(
+            ChunkPermission.sensitivity_level == "case_team",
+            ChunkPermission.disclosed_to_defense.is_(True)
+        ))
+        
+    return list(db.scalars(
+        select(ChunkPermission.chunk_id)
+        .where(base_filter, or_(*policy))
+    ).all())
 
 
 def _aes_key() -> bytes:
@@ -122,11 +135,28 @@ async def answer_with_groq(question: str, authorized_text: list[str]) -> str:
     context = "\n\n".join(f"[{i + 1}] {text}" for i, text in enumerate(authorized_text))
     prompt = f"Answer the legal case question using only this evidence context. If insufficient, say so.\n\nEvidence context:\n{context}\n\nQuestion: {question}"
     settings = get_settings()
+    messages = [{"role": "user", "content": prompt}]
+
+    # --- Demo capture hook: write exact messages payload (no keys, no auth) ---
+    if settings.demo_capture_llm_request:
+        import json as _json
+        from datetime import datetime as _dt, timezone as _tz
+        capture_dir = Path(__file__).resolve().parent.parent.parent / "evidence"
+        capture_dir.mkdir(exist_ok=True)
+        ts = _dt.now(_tz.utc).strftime("%Y%m%dT%H%M%S")
+        capture_path = capture_dir / f"llm_request_{ts}.json"
+        capture_path.write_text(_json.dumps({
+            "model": settings.groq_model,
+            "messages": messages,
+            "captured_at": _dt.now(_tz.utc).isoformat(),
+            "note": "API key and auth headers are NOT included in this capture.",
+        }, indent=2, ensure_ascii=False))
+
     try:
         client = AsyncGroq(api_key=settings.groq_api_key, timeout=60.0)
         response = await client.chat.completions.create(
             model=settings.groq_model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             stream=False
         )
         return response.choices[0].message.content.strip()

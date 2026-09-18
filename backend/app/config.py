@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(...)
     groq_model: str = "llama-3.3-70b-versatile"
     enable_tamper_demo_endpoint: bool = False
+    demo_capture_llm_request: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:
