@@ -1,92 +1,130 @@
-﻿import { useState, type FormEvent } from 'react'; import { LockKeyhole, Shield, ArrowLeft } from 'lucide-react';
-import { Button } from './ui/Button';
+import { useState, type FormEvent } from 'react';
+import { LockKeyhole, Shield, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { Input } from './ui/Input';
-import { api } from '../api/client';
 
-export function LandingAuth({ onLoginSuccess, error, onBack }: { onLoginSuccess: (result: any) => Promise<void>; error: string; onBack: () => void }) {
-  const [username,setUsername]=useState(''); 
-  const [password,setPassword]=useState(''); 
-  const [mfaCode, setMfaCode]=useState('');
-  const [challengeToken, setChallengeToken]=useState('');
-  const [busy,setBusy]=useState(false); 
-  const [localError, setLocalError] = useState('');
+export function LandingAuth({ onLogin, error, onBack, isDarkMode, onToggleDark }: {
+  onLogin: (username: string, password: string, challengeToken?: string, mfaCode?: string) => Promise<any>;
+  error: string;
+  onBack: () => void;
+  isDarkMode: boolean;
+  onToggleDark: () => void;
+}) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const submit=async(e:FormEvent)=>{
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setLocalError('');
-    try{
+    try { 
       if (challengeToken) {
-        const result = await api.verifyMfa(challengeToken, mfaCode);
-        await onLoginSuccess(result);
+        await onLogin(username, password, challengeToken, mfaCode);
       } else {
-        const result = await api.login(username, password);
-        if (result.mfa_required) {
-          setChallengeToken(result.challenge_token);
-        } else {
-          await onLoginSuccess(result);
+        const result = await onLogin(username, password);
+        if (result?.mfaRequired) {
+          setChallengeToken(result.challengeToken);
         }
       }
-    }catch(err: any){
-      setLocalError(err.message || 'Login failed');
-    }finally{
-      setBusy(false);
+    } catch {
+      // Error is handled by parent App.tsx
+    } finally { 
+      setBusy(false); 
     }
-  }; 
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center p-4">
-      <div className="w-full max-w-md">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-8 transition-colors">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" /> Back to home
         </button>
-        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
-          <div className="flex items-center gap-3 text-slate-900 mb-8">
-            <Shield className="w-8 h-8" strokeWidth={1.5} />
-            <span className="font-semibold tracking-wide text-lg">VAULTIS</span>
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{challengeToken ? 'Two-Factor Authentication' : 'Client Portal'}</h1>
-          <p className="mt-2 text-slate-600">{challengeToken ? 'Enter the 6-digit code from your authenticator app.' : 'Sign in to access your secure case vault.'}</p>
-          
-          <form onSubmit={submit} className="mt-8 space-y-5">
-            {(error || localError) && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600 border border-red-100">{error || localError}</p>}
-            
-            {!challengeToken ? (
-              <>
-                <Input 
-                  label="Username" 
-                  required 
-                  autoComplete="username" 
-                  value={username} 
-                  onChange={e=>setUsername(e.target.value)} 
-                />
-                
-                <Input 
-                  label="Password" 
-                  type="password" 
-                  required 
-                  autoComplete="current-password" 
-                  value={password} 
-                  onChange={e=>setPassword(e.target.value)} 
-                />
-              </>
-            ) : (
-              <Input 
-                label="Authentication Code" 
-                required 
-                autoComplete="one-time-code" 
-                value={mfaCode} 
-                onChange={e=>setMfaCode(e.target.value)} 
-                placeholder="000000"
-              />
-            )}
-            
-            <div className="pt-2">
-              <Button type="submit" fullWidth disabled={busy}>
-                {busy ? (challengeToken ? 'VerifyingΓÇª' : 'Signing inΓÇª') : (challengeToken ? 'Verify Code' : 'Sign in')}
-              </Button>
+        <button
+          onClick={onToggleDark}
+          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="rounded-full p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200"
+        >
+          {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Login card */}
+      <div className="grid place-items-center p-4 min-h-[calc(100vh-64px)]">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-8 shadow-2xl dark:shadow-slate-950 transition-colors">
+            {/* Logo */}
+            <div className="flex items-center gap-3 mb-8">
+              <span className="rounded-xl bg-slate-900 dark:bg-blue-600 p-2.5 text-white">
+                <Shield className="w-5 h-5" strokeWidth={1.5} />
+              </span>
+              <span className="font-bold tracking-wide text-xl text-slate-900 dark:text-white">VAULTIS</span>
             </div>
-          </form>
+
+            {/* Heading */}
+            <div className="flex items-center gap-2.5 mb-1">
+              <LockKeyhole className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" strokeWidth={1.5} />
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Secure Access</h1>
+            </div>
+            <p className="mt-1 text-slate-500 dark:text-slate-400 text-sm">
+              Authenticate your identity to access the case vault.
+            </p>
+
+            <form onSubmit={submit} className="mt-8 space-y-5">
+              {error && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700/50">
+                  {error}
+                </div>
+              )}
+              
+              {!challengeToken ? (
+                <>
+                  <Input
+                    label="Username"
+                    required
+                    autoComplete="username"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                  />
+                  <Input
+                    label="Password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                </>
+              ) : (
+                <Input
+                  label="MFA Code (TOTP)"
+                  type="text"
+                  required
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={e => setMfaCode(e.target.value)}
+                />
+              )}
+              
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full rounded-lg bg-slate-900 dark:bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-slate-700 dark:hover:bg-blue-500 disabled:opacity-50 transition-all duration-200 shadow-md"
+                >
+                  {busy ? 'Authenticating…' : (challengeToken ? 'Verify MFA' : 'Sign in to Vault')}
+                </button>
+              </div>
+            </form>
+
+            <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+              SIH26190 · Ministry of Home Affairs
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -9,6 +9,7 @@ export function AuditLogScreen() {
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const [demoEnabled,setDemoEnabled]=useState(false);
+  
   const load=async()=>{
     setBusy(true);setError('');
     try{
@@ -16,12 +17,7 @@ export function AuditLogScreen() {
       // Ensure data is an array
       setRecords(Array.isArray(data) ? data : (data as any).items || []);
       // Runtime check — backend controls whether tamper demo button appears
-      try {
-        const demoRes = await api.getDemoStatus();
-        setDemoEnabled(demoRes.tamper_demo_enabled === true);
-      } catch {
-        setDemoEnabled(false);
-      }
+      try { const d = await api.getDemoStatus(); setDemoEnabled(d.tamper_demo_enabled === true); } catch { setDemoEnabled(false); }
     }catch(e){
       setError(e instanceof Error?e.message:'Unable to load audit events');
     }finally{
