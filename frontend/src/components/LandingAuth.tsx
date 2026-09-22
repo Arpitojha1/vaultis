@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { LockKeyhole, Shield, ArrowLeft, Sun, Moon } from 'lucide-react';
-import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 export function LandingAuth({ onLogin, error, onBack, isDarkMode, onToggleDark }: {
-  onLogin: (username: string, password: string) => Promise<void>;
+  onLogin: (username: string, password: string, challengeToken?: string, mfaCode?: string) => Promise<any>;
   error: string;
   onBack: () => void;
   isDarkMode: boolean;
@@ -12,12 +11,27 @@ export function LandingAuth({ onLogin, error, onBack, isDarkMode, onToggleDark }
 }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    try { await onLogin(username, password); } finally { setBusy(false); }
+    try { 
+      if (challengeToken) {
+        await onLogin(username, password, challengeToken, mfaCode);
+      } else {
+        const result = await onLogin(username, password);
+        if (result?.mfaRequired) {
+          setChallengeToken(result.challengeToken);
+        }
+      }
+    } catch {
+      // Error is handled by parent App.tsx
+    } finally { 
+      setBusy(false); 
+    }
   };
 
   return (
@@ -66,28 +80,43 @@ export function LandingAuth({ onLogin, error, onBack, isDarkMode, onToggleDark }
                   {error}
                 </div>
               )}
-              <Input
-                label="Username"
-                required
-                autoComplete="username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-              />
-              <Input
-                label="Password"
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
+              
+              {!challengeToken ? (
+                <>
+                  <Input
+                    label="Username"
+                    required
+                    autoComplete="username"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                  />
+                  <Input
+                    label="Password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                </>
+              ) : (
+                <Input
+                  label="MFA Code (TOTP)"
+                  type="text"
+                  required
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={e => setMfaCode(e.target.value)}
+                />
+              )}
+              
               <div className="pt-2">
                 <button
                   type="submit"
                   disabled={busy}
                   className="w-full rounded-lg bg-slate-900 dark:bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-slate-700 dark:hover:bg-blue-500 disabled:opacity-50 transition-all duration-200 shadow-md"
                 >
-                  {busy ? 'Authenticating…' : 'Sign in to Vault'}
+                  {busy ? 'Authenticating…' : (challengeToken ? 'Verify MFA' : 'Sign in to Vault')}
                 </button>
               </div>
             </form>

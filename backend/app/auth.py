@@ -18,6 +18,12 @@ def create_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
+def create_mfa_challenge_token(user: User) -> str:
+    settings = get_settings()
+    payload = {"mfa_user_id": user.user_id, "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
+
 def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)) -> User:
     try:
         payload = jwt.decode(credentials.credentials, get_settings().jwt_secret, algorithms=["HS256"])

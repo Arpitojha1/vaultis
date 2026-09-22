@@ -56,16 +56,26 @@ export default function App() {
     finally { setLoading(false); }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, challengeToken?: string, mfaCode?: string) => {
     setError('');
     try {
-      const result = await api.login(username, password);
+      let result;
+      if (challengeToken && mfaCode) {
+        result = await api.verifyMfa(challengeToken, mfaCode);
+      } else {
+        result = await api.login(username, password);
+        if (result.mfa_required) {
+          return { mfaRequired: true, challengeToken: result.challenge_token };
+        }
+      }
       setAuthToken(result.token);
       setUser(result.user);
       const loaded = await refreshCases();
       setScreen(loaded.length ? 'dashboard' : 'prepare');
+      return { mfaRequired: false };
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
+      throw e;
     }
   };
 
