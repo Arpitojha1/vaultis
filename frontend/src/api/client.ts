@@ -54,4 +54,5 @@ export const api = {
   getEncryptionStatus: (documentId: number) => request(`/documents/${documentId}/encryption-status`),
   getDocumentView: (documentId: string) => requestRaw(`/documents/${documentId}/view`),
   deleteCase: (caseId: number) => request(`/cases/${caseId}`, { method: 'DELETE' }),
+  getDemoStatus: () => request('/demo-status'),
 };

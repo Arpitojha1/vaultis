@@ -7,7 +7,7 @@ import httpx
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException, UploadFile
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .models import ChunkPermission, Document
@@ -25,12 +25,25 @@ def get_chroma_collection():
 def get_allowed_chunk_ids(db: Session, case_id: int, user_role: str) -> list[str]:
     """Permission truth is freshly selected from PostgreSQL for every query."""
     permitted_team_roles = ("investigating_officer", "prosecutor", "judge")
+    # Base security boundary: nobody can see sealed chunks via RAG
+    base_filter = and_(
+        ChunkPermission.case_id == case_id,
+        ChunkPermission.sensitivity_level != "sealed"
+    )
+
     policy = [ChunkPermission.sensitivity_level == "public"]
     if user_role in permitted_team_roles:
-        policy.append(ChunkPermission.sensitivity_level.in_(("public", "case_team")))
+        policy.append(ChunkPermission.sensitivity_level == "case_team")
     if user_role == "defense_lawyer":
-        policy.append(ChunkPermission.disclosed_to_defense.is_(True))
-    return list(db.scalars(select(ChunkPermission.chunk_id).where(ChunkPermission.case_id == case_id, or_(*policy))).all())
+        policy.append(and_(
+            ChunkPermission.sensitivity_level == "case_team",
+            ChunkPermission.disclosed_to_defense.is_(True)
+        ))
+
+    return list(db.scalars(
+        select(ChunkPermission.chunk_id)
+        .where(base_filter, or_(*policy))
+    ).all())
 
 
 def _aes_key() -> bytes:
