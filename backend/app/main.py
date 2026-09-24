@@ -1,9 +1,7 @@
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import io
-from typing import Dict, Tuple
-from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -33,7 +31,7 @@ async def preload_model():
             async with httpx.AsyncClient(timeout=120) as client:
                 await client.post(
                     f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    json={"model": settings.ollama_model, "keep_alive": -1}
+                    json={"model": settings.ollama_model, "keep_alive": -1, "think": False, "options": {"num_ctx": 16384}}
                 )
         except Exception as e:
             print(f"Failed to preload model: {e}")
@@ -66,32 +64,12 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-# In-memory rate limiter: dict mapping IP to (count, reset_time)
-login_attempts: Dict[str, Tuple[int, datetime]] = {}
-
-
 @app.post("/auth/login")
-def login(request: LoginRequest, fastapi_request: Request, db: Session = Depends(get_db)) -> dict:
-    client_ip = fastapi_request.client.host if fastapi_request.client else "unknown"
-    now = datetime.now(timezone.utc)
-
-    # Rate limit check: max 5 attempts per minute per IP
-    attempts, reset_time = login_attempts.get(client_ip, (0, now))
-    if now > reset_time:
-        attempts = 0
-        reset_time = now + timedelta(minutes=1)
-    if attempts >= 5:
-        raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
-
+def login(request: LoginRequest, db: Session = Depends(get_db)) -> dict:
     user = db.scalar(select(User).where(User.username == request.username))
     if not user or not password_hash.verify(request.password, user.password_hash):
-        login_attempts[client_ip] = (attempts + 1, reset_time)
         raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    # On success, clear rate limit
-    if client_ip in login_attempts:
-        del login_attempts[client_ip]
-
+        
     if user.mfa_enabled:
         from .auth import create_mfa_challenge_token
         return {"mfa_required": True, "challenge_token": create_mfa_challenge_token(user)}
@@ -199,13 +177,6 @@ async def upload_document(case_id: int, file: UploadFile = File(...), sensitivit
         raise HTTPException(status_code=403, detail="No access to this case")
     if sensitivity_level not in {"public", "case_team", "sealed"}:
         raise HTTPException(status_code=422, detail="Invalid sensitivity_level")
-
-    # Strictly validate magic bytes — only PDF, PNG, JPEG allowed
-    header = await file.read(8)
-    await file.seek(0)
-    if not (header.startswith(b"%PDF") or header.startswith(b"\x89PNG\r\n\x1a\n") or header.startswith(b"\xff\xd8\xff")):
-        raise HTTPException(status_code=415, detail="Unsupported file type. Only PDF, PNG, and JPEG are allowed.")
-
     document, chunks_created = await ingest_document(db, case_id, file, sensitivity_level, disclosed_to_defense)
     append_record(db, "document_ingest", user.user_id, {"case_id": case_id, "document_id": document.document_id, "filename": document.filename, "chunks_created": chunks_created})
     db.commit()
@@ -224,9 +195,7 @@ async def answer_query(request: AnswerRequest, user: User = Depends(current_user
             raise HTTPException(status_code=404, detail="Document not found in this case")
             
     answer, authorized, filtered, allowed_ids = await retrieve_answer(db, request.case_id, user.role, request.question, request.document_id)
-    # chunks_used logs the IDs actually placed in the LLM prompt, not all allowed candidates
-    retrieved_ids = [c["chunk_id"] for c in authorized]
-    append_record(db, "evidentiary_query", user.user_id, {"case_id": request.case_id, "question": request.question, "chunks_used": retrieved_ids, "allowed_count": len(allowed_ids)})
+    append_record(db, "evidentiary_query", user.user_id, {"case_id": request.case_id, "question": request.question, "chunks_used": allowed_ids})
     db.commit()
     return {"answer": answer, "authorized_chunks": authorized, "filtered_chunks": filtered}
 
@@ -383,10 +352,3 @@ def tamper(record_id: int, db: Session = Depends(get_db)) -> dict:
     record.payload = {**record.payload, "demo_tampered": True}
     db.commit()
     return {"record_id": record_id, "tampered": True}
-
-
-@app.get("/demo-status")
-def demo_status() -> dict:
-    """Reports whether demo-only features are enabled. Used by the frontend
-    to conditionally show the tamper button."""
-    return {"tamper_demo_enabled": get_settings().enable_tamper_demo_endpoint}

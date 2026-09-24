@@ -136,7 +136,16 @@ async def answer_with_ollama(question: str, authorized_text: list[str]) -> str:
     settings = get_settings()
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(f"{settings.ollama_base_url.rstrip('/')}/api/generate", json={"model": settings.ollama_model, "prompt": prompt, "stream": False})
+            response = await client.post(
+                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                json={
+                    "model": settings.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "think": False,  # Disable qwen3 thinking for faster RAG responses
+                    "options": {"num_ctx": 16384},  # 16k context window
+                }
+            )
             response.raise_for_status()
             return response.json()["response"].strip()
     except (httpx.HTTPError, KeyError) as exc:

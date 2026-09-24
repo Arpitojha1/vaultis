@@ -13,8 +13,27 @@ import { LandingPage } from './components/LandingPage';
 
 type Screen = 'dashboard' | 'chat' | 'audit' | 'prepare' | 'documents' | 'doc-chat';
 
+const SESSION_KEY = 'vaultis-session';
+
+function saveSession(token: string, user: User) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, user })); } catch { /* noop */ }
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch { /* noop */ }
+}
+function loadSession(): { token: string; user: User } | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as { token: string; user: User };
+  } catch { return null; }
+}
+
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  // Rehydrate from localStorage synchronously so there's no flash
+  const savedSession = loadSession();
+
+  const [user, setUser] = useState<User | null>(savedSession?.user ?? null);
   const [cases, setCases] = useState<ApiCase[]>([]);
   const [caseItem, setCaseItem] = useState<ApiCase | null>(null);
   const [screen, setScreen] = useState<Screen>('dashboard');
@@ -23,6 +42,7 @@ export default function App() {
   const [docId, setDocId] = useState<string | null>(null);
   const [docFilename, setDocFilename] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [sessionRestored, setSessionRestored] = useState(false);
 
   // ── Dark mode: stored in localStorage, default = LIGHT ──────────────────
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -43,6 +63,7 @@ export default function App() {
   // ────────────────────────────────────────────────────────────────────────
 
   const logout = () => {
+    clearSession();
     setAuthToken(null); setUser(null); setCases([]); setCaseItem(null);
     setScreen('dashboard'); setDocId(null); setDocFilename(null); setShowLogin(false);
   };
@@ -55,6 +76,18 @@ export default function App() {
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load cases'); return []; }
     finally { setLoading(false); }
   };
+
+  // Restore session on mount: set token in API client and re-fetch cases
+  useEffect(() => {
+    if (savedSession) {
+      setAuthToken(savedSession.token);
+      // Fetch cases in background; if token is expired the 401 handler will logout
+      refreshCases().finally(() => setSessionRestored(true));
+    } else {
+      setSessionRestored(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = async (username: string, password: string, challengeToken?: string, mfaCode?: string) => {
     setError('');
@@ -70,6 +103,7 @@ export default function App() {
       }
       setAuthToken(result.token);
       setUser(result.user);
+      saveSession(result.token, result.user);
       const loaded = await refreshCases();
       setScreen(loaded.length ? 'dashboard' : 'prepare');
       return { mfaRequired: false };
@@ -81,6 +115,21 @@ export default function App() {
 
   // ── The 'dark' class lives on this wrapper div — no DOM hacks needed ────
   // Tailwind's @custom-variant dark (&:is(.dark *)) targets descendants of .dark
+
+  // Don't render anything until we've attempted session restore — avoids flash-of-landing
+  if (!sessionRestored) {
+    return (
+      <div className={isDarkMode ? 'dark' : ''}>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-700 dark:border-t-slate-300 animate-spin" />
+            <p className="text-sm text-slate-400 dark:text-slate-500">Restoring session…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={isDarkMode ? 'dark' : ''}>
       {!user && !showLogin && (
