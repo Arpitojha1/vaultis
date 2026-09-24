@@ -197,7 +197,20 @@ async def answer_query(request: AnswerRequest, user: User = Depends(current_user
     answer, authorized, filtered, allowed_ids = await retrieve_answer(db, request.case_id, user.role, request.question, request.document_id)
     append_record(db, "evidentiary_query", user.user_id, {"case_id": request.case_id, "question": request.question, "chunks_used": allowed_ids})
     db.commit()
-    return {"answer": answer, "authorized_chunks": authorized, "filtered_chunks": filtered}
+    # Only roles with full evidence access receive the raw chunk text.
+    # Defense lawyers and others get metadata only to prevent verbatim document leakage.
+    _text_privileged_roles = {"judge", "prosecutor", "investigating_officer"}
+    include_text = user.role in _text_privileged_roles
+    serialized_chunks = [
+        {
+            "chunk_id": c["chunk_id"],
+            "document_id": c["document_id"],
+            "sensitivity_level": c["sensitivity_level"],
+            **({"text": c["text"]} if include_text else {}),
+        }
+        for c in authorized
+    ]
+    return {"answer": answer, "authorized_chunks": serialized_chunks, "filtered_chunks": filtered}
 
 
 @app.get("/documents/{document_id}/encryption-status")
